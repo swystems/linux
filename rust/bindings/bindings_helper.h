@@ -8,7 +8,7 @@
 
 #include <kunit/test.h>
 #include <linux/errname.h>
-#include <linux/net.h>
+#include <linux/netfilter.h>
 #include <linux/slab.h>
 #include <linux/refcount.h>
 #include <linux/wait.h>
