@@ -80,6 +80,12 @@ impl SocketAddr {
         pr_info!("C structure size: {}", struct_size);
         struct_size
     }
+    pub fn ptr(&self) -> *mut bindings::sockaddr {
+        match self {
+            SocketAddr::V4(addr) => addr as *const _ as _,
+            SocketAddr::V6(addr) => addr as *const _ as _,
+        }
+    }
 }
 
 trait SocketAddressInfo<T> {
