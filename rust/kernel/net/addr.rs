@@ -1,5 +1,5 @@
+use crate::net::AddressFamily;
 use core::fmt::Display;
-use crate::{pr_info};
 
 #[repr(transparent)]
 pub struct Ipv4Addr(pub(crate) bindings::in_addr);
@@ -7,7 +7,7 @@ pub struct Ipv4Addr(pub(crate) bindings::in_addr);
 impl Ipv4Addr {
     pub const fn new(a: u8, b: u8, c: u8, d: u8) -> Self {
         Ipv4Addr(bindings::in_addr {
-            s_addr: u32::from_ne_bytes([a.to_be(), b.to_be(), c.to_be(), d.to_be()])
+            s_addr: u32::from_ne_bytes([a.to_be(), b.to_be(), c.to_be(), d.to_be()]),
         })
     }
     pub const fn from(octets: [u8; 4]) -> Self {
@@ -31,7 +31,6 @@ impl Display for Ipv4Addr {
     }
 }
 
-
 #[repr(transparent)]
 pub struct Ipv6Addr(pub(crate) bindings::in6_addr);
 
@@ -41,9 +40,7 @@ impl Ipv6Addr {
     }
     pub const fn from(octets: [u16; 8]) -> Self {
         Ipv6Addr(bindings::in6_addr {
-            in6_u: bindings::in6_addr__bindgen_ty_1 {
-                u6_addr16: octets,
-            },
+            in6_u: bindings::in6_addr__bindgen_ty_1 { u6_addr16: octets },
         })
     }
     pub fn octets(&self) -> &[u16; 8] {
@@ -57,38 +54,25 @@ impl Ipv6Addr {
 impl Display for Ipv6Addr {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let octets = self.octets();
-        write!(f, "{:x}:{:x}:{:x}:{:x}:{:x}:{:x}:{:x}:{:x}", octets[0], octets[1], octets[2], octets[3], octets[4], octets[5], octets[6], octets[7])
+        write!(
+            f,
+            "{:x}:{:x}:{:x}:{:x}:{:x}:{:x}:{:x}:{:x}",
+            octets[0], octets[1], octets[2], octets[3], octets[4], octets[5], octets[6], octets[7]
+        )
     }
 }
 
-pub enum SocketAddr {
-    V4(SocketAddrV4),
-    V6(SocketAddrV6),
+pub trait SocketAddr {
+    fn size() -> usize
+    where
+        Self: Sized,
+    {
+        core::mem::size_of::<Self>()
+    }
+    fn family() -> AddressFamily;
 }
 
-impl SocketAddr {
-    pub fn size(&self) -> usize {
-        pr_info!("Rust structure instance size: {}", core::mem::size_of_val(self));
-        let struct_size = match self {
-            SocketAddr::V4(_) => {
-                core::mem::size_of::<bindings::sockaddr_in>()
-            }
-            SocketAddr::V6(_) => {
-                core::mem::size_of::<bindings::sockaddr_in6>()
-            }
-        };
-        pr_info!("C structure size: {}", struct_size);
-        struct_size
-    }
-    pub fn ptr(&self) -> *mut bindings::sockaddr {
-        match self {
-            SocketAddr::V4(addr) => addr as *const _ as _,
-            SocketAddr::V6(addr) => addr as *const _ as _,
-        }
-    }
-}
-
-trait SocketAddressInfo<T> {
+pub trait SocketAddressInfo<T> {
     fn address(&self) -> &T;
     fn port(&self) -> u16;
 }
@@ -104,6 +88,12 @@ impl SocketAddrV4 {
             sin_addr: addr.0,
             __pad: [0; 8],
         })
+    }
+}
+
+impl SocketAddr for SocketAddrV4 {
+    fn family() -> AddressFamily {
+        AddressFamily::Inet
     }
 }
 
@@ -129,6 +119,12 @@ impl SocketAddrV6 {
             sin6_addr: addr.0,
             sin6_scope_id: scope_id,
         })
+    }
+}
+
+impl SocketAddr for SocketAddrV6 {
+    fn family() -> AddressFamily {
+        AddressFamily::Inet6
     }
 }
 
