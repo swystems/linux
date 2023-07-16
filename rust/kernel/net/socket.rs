@@ -19,6 +19,44 @@ pub enum ShutdownCmd {
 }
 
 #[repr(transparent)]
+pub struct Message(bindings::msghdr);
+
+impl Message {
+    pub fn new<T: SocketAddr>(address: &T, flags: u32) -> Self {
+        let mut message = bindings::msghdr::default();
+        message.msg_name = address as *const _ as _;
+        message.msg_namelen = T::size() as _;
+        message.msg_flags = flags;
+        Self { 0: message }
+    }
+    pub fn default() -> Self {
+        Self {
+            0: bindings::msghdr::default(),
+        }
+    }
+    pub const fn address<T: SocketAddr>(&self) -> Option<&T> {
+        if self.0.msg_namelen == 0 {
+            None
+        } else {
+            Some(unsafe { &*(self.0.msg_name as *const _ as *const T) })
+        }
+    }
+    pub const fn flags(&self) -> u32 {
+        self.0.msg_flags as _
+    }
+}
+
+impl Drop for Message {
+    fn drop(&mut self) {
+        if !self.0.msg_control.is_null() {
+            unsafe {
+                bindings::kfree(self.0.msg_control as _);
+            }
+        }
+    }
+}
+
+#[repr(transparent)]
 pub struct Socket(*mut bindings::socket);
 
 impl Socket {
@@ -109,6 +147,49 @@ impl Socket {
 
     pub fn shutdown(&self, how: ShutdownCmd) -> Result {
         unsafe { to_result(bindings::kernel_sock_shutdown(self.0, how as _)) }
+    }
+
+    pub fn receive(&self, bytes: &mut [u8], block: bool) -> Result<(usize, Message)> {
+        let mut message: Message = unsafe { core::mem::zeroed() };
+        let mut vec = bindings::kvec {
+            iov_base: bytes.as_mut_ptr() as _,
+            iov_len: bytes.len() as _,
+        };
+        let flags: i32 = if block {
+            0
+        } else {
+            bindings::MSG_DONTWAIT as _
+        };
+        let size = unsafe {
+            bindings::kernel_recvmsg(
+                self.0,
+                &mut message.0,
+                &mut vec,
+                1,
+                bytes.len() as _,
+                flags as _,
+            )
+        };
+        to_result(size)?;
+        Ok((size as _, message))
+    }
+
+    pub fn send(&self, bytes: &[u8], message: Option<Message>) -> Result<usize> {
+        let mut vec = bindings::kvec {
+            iov_base: bytes.as_ptr() as _,
+            iov_len: bytes.len() as _,
+        };
+        let size = unsafe {
+            bindings::kernel_sendmsg(
+                self.0,
+                &message.unwrap_or(Message::default()).0 as *const _ as _,
+                &mut vec,
+                1,
+                bytes.len() as _,
+            )
+        };
+        to_result(size)?;
+        Ok(size as _)
     }
 }
 
