@@ -46,16 +46,6 @@ impl Message {
     }
 }
 
-impl Drop for Message {
-    fn drop(&mut self) {
-        if !self.0.msg_control.is_null() {
-            unsafe {
-                bindings::kfree(self.0.msg_control as _);
-            }
-        }
-    }
-}
-
 #[repr(transparent)]
 pub struct Socket(*mut bindings::socket);
 
@@ -198,5 +188,79 @@ impl Drop for Socket {
         unsafe {
             bindings::sock_release(self.0);
         }
+    }
+}
+
+#[repr(transparent)]
+pub struct TcpSocket(Socket);
+
+impl TcpSocket {
+    pub fn new() -> Result<Self> {
+        Ok(Self(Socket::new(
+            AddressFamily::Inet,
+            SockType::Stream,
+            IpProtocol::Tcp,
+        )?))
+    }
+
+    pub fn new_kern(ns: &Namespace) -> Result<Self> {
+        Ok(Self(Socket::new_kern(
+            ns,
+            AddressFamily::Inet,
+            SockType::Stream,
+            IpProtocol::Tcp,
+        )?))
+    }
+
+    pub fn new_lite() -> Result<Self> {
+        Ok(Self(Socket::new_lite(
+            AddressFamily::Inet,
+            SockType::Stream,
+            IpProtocol::Tcp,
+        )?))
+    }
+
+    pub fn create_and_listen<T: SocketAddr>(address: &T, backlog: i32) -> Result<Self> {
+        let socket = Self::new()?;
+        socket.bind(address)?;
+        socket.listen(backlog)?;
+        Ok(socket)
+    }
+
+    pub fn bind<T: SocketAddr>(&self, address: &T) -> Result {
+        self.0.bind(address)
+    }
+
+    pub fn listen(&self, backlog: i32) -> Result {
+        self.0.listen(backlog)
+    }
+
+    pub fn accept(&self, block: bool) -> Result<Self> {
+        Ok(Self(self.0.accept(block)?))
+    }
+
+    pub fn sockname<T: SocketAddr>(&self) -> Result<T> {
+        self.0.sockname()
+    }
+
+    pub fn peername<T: SocketAddr>(&self) -> Result<T> {
+        self.0.peername()
+    }
+
+    pub fn connect<T: SocketAddr>(&self, address: &mut T, flags: i32) -> Result {
+        self.0.connect(address, flags)
+    }
+
+    pub fn shutdown(&self, how: ShutdownCmd) -> Result {
+        self.0.shutdown(how)
+    }
+
+    pub fn receive(&self, bytes: &mut [u8], block: bool) -> Result<usize> {
+        let (size, _) = self.0.receive(bytes, block)?;
+        Ok(size)
+    }
+
+    pub fn send(&self, bytes: &[u8]) -> Result<usize> {
+        self.0.send(bytes, None)
     }
 }
