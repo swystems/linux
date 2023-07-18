@@ -204,7 +204,6 @@ impl Drop for Socket {
     }
 }
 
-#[repr(transparent)]
 pub struct TcpSocket(Socket);
 
 impl TcpSocket {
@@ -275,5 +274,65 @@ impl TcpSocket {
 
     pub fn send(&self, bytes: &[u8]) -> Result<usize> {
         self.0.send(bytes)
+    }
+}
+
+pub struct UdpSocket(Socket);
+
+impl UdpSocket {
+    pub fn new() -> Result<Self> {
+        Ok(Self(Socket::new(
+            AddressFamily::Inet,
+            SockType::Datagram,
+            IpProtocol::Udp,
+        )?))
+    }
+
+    pub fn new_kern(ns: &Namespace) -> Result<Self> {
+        Ok(Self(Socket::new_kern(
+            ns,
+            AddressFamily::Inet,
+            SockType::Datagram,
+            IpProtocol::Udp,
+        )?))
+    }
+
+    pub fn new_lite() -> Result<Self> {
+        Ok(Self(Socket::new_lite(
+            AddressFamily::Inet,
+            SockType::Datagram,
+            IpProtocol::Udp,
+        )?))
+    }
+
+    pub fn create_and_bind<T: SocketAddr>(address: &T) -> Result<Self> {
+        let socket = Self::new()?;
+        socket.bind(address)?;
+        Ok(socket)
+    }
+
+    pub fn bind<T: SocketAddr>(&self, address: &T) -> Result {
+        self.0.bind(address)
+    }
+
+    pub fn sockname<T: SocketAddr>(&self) -> Result<T> {
+        self.0.sockname()
+    }
+
+    pub fn peername<T: SocketAddr>(&self) -> Result<T> {
+        self.0.peername()
+    }
+
+    pub fn connect<T: SocketAddr>(&self, address: &mut T, flags: i32) -> Result {
+        self.0.connect(address, flags)
+    }
+
+    pub fn send_to<T: SocketAddr>(&self, bytes: &[u8], address: T) -> Result<usize> {
+        self.0.send_to(bytes, address)
+    }
+
+    pub fn receive_from<T: SocketAddr>(&self, bytes: &mut [u8], block: bool) -> Result<(usize, T)> {
+        let (size, message) = self.0.receive(bytes, block)?;
+        Ok((size, message.address::<T>().unwrap().clone()))
     }
 }

@@ -62,7 +62,7 @@ impl Display for Ipv6Addr {
     }
 }
 
-pub trait SocketAddr {
+pub trait SocketAddr: Copy {
     fn size() -> usize
     where
         Self: Sized,
@@ -78,6 +78,7 @@ pub trait SocketAddressInfo<T> {
 }
 
 #[repr(transparent)]
+#[derive(Copy, Clone)]
 pub struct SocketAddrV4(pub(crate) bindings::sockaddr_in);
 
 impl SocketAddrV4 {
@@ -108,6 +109,7 @@ impl SocketAddressInfo<Ipv4Addr> for SocketAddrV4 {
 }
 
 #[repr(transparent)]
+#[derive(Copy, Clone)]
 pub struct SocketAddrV6(pub(crate) bindings::sockaddr_in6);
 
 impl SocketAddrV6 {
