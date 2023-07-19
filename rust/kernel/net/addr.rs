@@ -62,7 +62,60 @@ impl Display for Ipv6Addr {
     }
 }
 
-pub trait SocketAddr: Copy {
+pub enum SocketAddr {
+    V4(SocketAddrV4),
+    V6(SocketAddrV6),
+}
+
+impl SocketAddr {
+    pub fn size(&self) -> usize {
+        match self {
+            SocketAddr::V4(_) => SocketAddrV4::size(),
+            SocketAddr::V6(_) => SocketAddrV6::size(),
+        }
+    }
+    pub fn family(&self) -> AddressFamily {
+        match self {
+            SocketAddr::V4(_) => AddressFamily::Inet,
+            SocketAddr::V6(_) => AddressFamily::Inet6,
+        }
+    }
+    pub fn into_addr<T: GenericSocketAddr>(self) -> T {
+        unsafe { core::ptr::read(self.as_ptr() as *const T) }
+    }
+    pub fn try_into<T: GenericSocketAddr>(self) -> Option<T> {
+        if self.family() as isize == T::family() as isize {
+            Some(self.into_addr())
+        } else {
+            None
+        }
+    }
+}
+
+impl SocketAddr {
+    pub(crate) fn as_ptr_mut(&mut self) -> *mut bindings::sockaddr {
+        self.as_ptr() as _
+    }
+    pub(crate) fn as_ptr(&self) -> *const bindings::sockaddr {
+        match self {
+            SocketAddr::V4(addr) => addr as *const _ as _,
+            SocketAddr::V6(addr) => addr as *const _ as _,
+        }
+    }
+    pub(crate) fn from_raw(sockaddr: bindings::sockaddr) -> Self {
+        match sockaddr.sa_family as u32 {
+            bindings::AF_INET => SocketAddr::V4(unsafe {
+                core::ptr::read(&sockaddr as *const _ as *const SocketAddrV4)
+            }),
+            bindings::AF_INET6 => SocketAddr::V6(unsafe {
+                core::ptr::read(&sockaddr as *const _ as *const SocketAddrV6)
+            }),
+            _ => panic!("Invalid address family"),
+        }
+    }
+}
+
+pub trait GenericSocketAddr: Copy {
     fn size() -> usize
     where
         Self: Sized,
@@ -92,7 +145,7 @@ impl SocketAddrV4 {
     }
 }
 
-impl SocketAddr for SocketAddrV4 {
+impl GenericSocketAddr for SocketAddrV4 {
     fn family() -> AddressFamily {
         AddressFamily::Inet
     }
@@ -124,7 +177,7 @@ impl SocketAddrV6 {
     }
 }
 
-impl SocketAddr for SocketAddrV6 {
+impl GenericSocketAddr for SocketAddrV6 {
     fn family() -> AddressFamily {
         AddressFamily::Inet6
     }
