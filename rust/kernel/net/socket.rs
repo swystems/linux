@@ -28,22 +28,22 @@ impl Message {
         obj.0.msg_name = &obj.1 as *const _ as _;
         obj
     }
-    pub fn from<T: GenericSocketAddr>(address: T) -> Self {
+    pub fn from(address: SocketAddr) -> Self {
         let mut msg = Self::new_empty();
         msg.set_address(address);
         msg
     }
-    fn set_address<T: GenericSocketAddr>(&mut self, address: T) {
-        unsafe {
-            core::ptr::copy(&address as *const _, &mut self.1 as *mut _ as _, 1);
-        }
-        self.0.msg_namelen = T::size() as _;
+    pub(crate) fn set_address(&mut self, address: SocketAddr) {
+        let len = address.size();
+        self.1 = address.into_raw();
+        self.0.msg_name = &self.1 as *const _ as _;
+        self.0.msg_namelen = len as _;
     }
-    pub fn address<T: GenericSocketAddr>(&self) -> Option<&T> {
+    pub fn owned_address(self) -> Option<SocketAddr> {
         if self.0.msg_namelen == 0 {
             None
         } else {
-            Some(unsafe { &*(&self.1 as *const _ as *const T) })
+            Some(SocketAddr::from_raw(self.1))
         }
     }
 }
@@ -178,10 +178,7 @@ impl Socket {
         self.send_msg(bytes, Message::new_empty())
     }
 
-    pub fn send_to<T>(&self, bytes: &[u8], address: T) -> Result<usize>
-    where
-        T: GenericSocketAddr,
-    {
+    pub fn send_to(&self, bytes: &[u8], address: SocketAddr) -> Result<usize> {
         self.send_msg(bytes, Message::from(address))
     }
 }

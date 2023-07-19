@@ -113,6 +113,12 @@ impl SocketAddr {
             _ => panic!("Invalid address family"),
         }
     }
+    pub(crate) fn into_raw(self) -> bindings::sockaddr {
+        match self {
+            SocketAddr::V4(addr) => unsafe { core::ptr::read(&addr as *const _ as *const _) },
+            SocketAddr::V6(addr) => unsafe { core::ptr::read(&addr as *const _ as *const _) },
+        }
+    }
 }
 
 pub trait GenericSocketAddr: Copy {
