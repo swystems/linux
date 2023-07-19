@@ -3,6 +3,7 @@ use core::cell::UnsafeCell;
 pub mod addr;
 pub mod socket;
 pub mod tcp;
+pub mod udp;
 
 pub enum AddressFamily {
     Unspec = bindings::AF_UNSPEC as isize,
