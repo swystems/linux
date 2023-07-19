@@ -18,36 +18,6 @@ pub enum ShutdownCmd {
     RdWr = bindings::sock_shutdown_cmd_SHUT_RDWR as isize,
 }
 
-pub struct Message(pub(crate) bindings::msghdr, bindings::sockaddr);
-
-impl Message {
-    pub fn new_empty() -> Self {
-        let mut obj = Self(unsafe { core::mem::zeroed() }, unsafe {
-            core::mem::zeroed()
-        });
-        obj.0.msg_name = &obj.1 as *const _ as _;
-        obj
-    }
-    pub fn from(address: SocketAddr) -> Self {
-        let mut msg = Self::new_empty();
-        msg.set_address(address);
-        msg
-    }
-    pub(crate) fn set_address(&mut self, address: SocketAddr) {
-        let len = address.size();
-        self.1 = address.into_raw();
-        self.0.msg_name = &self.1 as *const _ as _;
-        self.0.msg_namelen = len as _;
-    }
-    pub fn owned_address(self) -> Option<SocketAddr> {
-        if self.0.msg_namelen == 0 {
-            None
-        } else {
-            Some(SocketAddr::from_raw(self.1))
-        }
-    }
-}
-
 #[repr(transparent)]
 pub struct Socket(*mut bindings::socket);
 
@@ -131,8 +101,15 @@ impl Socket {
         unsafe { to_result(bindings::kernel_sock_shutdown(self.0, how as _)) }
     }
 
-    pub fn receive(&self, bytes: &mut [u8], block: bool) -> Result<(usize, Message)> {
-        let mut message: Message = Message::new_empty();
+    pub fn receive_from(
+        &self,
+        bytes: &mut [u8],
+        block: bool,
+    ) -> Result<(usize, Option<SocketAddr>)> {
+        let mut addr: bindings::sockaddr = unsafe { core::mem::zeroed() };
+        let mut msg: bindings::msghdr = unsafe { core::mem::zeroed() };
+        msg.msg_name = &addr as *const _ as _;
+
         let mut vec = bindings::kvec {
             iov_base: bytes.as_mut_ptr() as _,
             iov_len: bytes.len() as _,
@@ -145,7 +122,7 @@ impl Socket {
         let size = unsafe {
             bindings::kernel_recvmsg(
                 self.0,
-                &mut message.0,
+                &mut msg as *mut _ as _,
                 &mut vec,
                 1,
                 bytes.len() as _,
@@ -153,10 +130,20 @@ impl Socket {
             )
         };
         to_result(size)?;
-        Ok((size as _, message))
+        let address = if msg.msg_namelen > 0 {
+            Some(SocketAddr::from_raw(addr))
+        } else {
+            None
+        };
+        Ok((size as _, address))
     }
 
-    pub fn send_msg(&self, bytes: &[u8], message: Message) -> Result<usize> {
+    pub fn receive(&self, bytes: &mut [u8], block: bool) -> Result<usize> {
+        let (size, _) = self.receive_from(bytes, block)?;
+        Ok(size)
+    }
+
+    pub(crate) fn send_msg(&self, bytes: &[u8], message: bindings::msghdr) -> Result<usize> {
         let mut vec = bindings::kvec {
             iov_base: bytes.as_ptr() as _,
             iov_len: bytes.len() as _,
@@ -164,7 +151,7 @@ impl Socket {
         let size = unsafe {
             bindings::kernel_sendmsg(
                 self.0,
-                &message.0 as *const _ as _,
+                &message as *const _ as _,
                 &mut vec,
                 1,
                 bytes.len() as _,
@@ -175,11 +162,14 @@ impl Socket {
     }
 
     pub fn send(&self, bytes: &[u8]) -> Result<usize> {
-        self.send_msg(bytes, Message::new_empty())
+        self.send_msg(bytes, unsafe { core::mem::zeroed() })
     }
 
-    pub fn send_to(&self, bytes: &[u8], address: SocketAddr) -> Result<usize> {
-        self.send_msg(bytes, Message::from(address))
+    pub fn send_to(&self, bytes: &[u8], address: &SocketAddr) -> Result<usize> {
+        let mut message: bindings::msghdr = unsafe { core::mem::zeroed() };
+        message.msg_name = address.as_ptr() as _;
+        message.msg_namelen = address.size() as _;
+        self.send_msg(bytes, message)
     }
 }
 

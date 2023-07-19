@@ -31,11 +31,11 @@ impl UdpSocket {
 
     pub fn receive(&self, buf: &mut [u8], block: bool) -> Result<(usize, SocketAddr)> {
         self.0
-            .receive(buf, block)
-            .map(|(size, msg)| (size, msg.owned_address().unwrap()))
+            .receive_from(buf, block)
+            .map(|(size, addr)| (size, addr.unwrap()))
     }
 
-    pub fn send(&self, buf: &[u8], address: SocketAddr) -> Result<usize> {
-        self.0.send_to(buf, address)
+    pub fn send(&self, buf: &[u8], address: &SocketAddr) -> Result<usize> {
+        self.0.send_to(buf, &address)
     }
 }

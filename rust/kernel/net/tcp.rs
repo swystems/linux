@@ -25,7 +25,7 @@ pub struct TcpStream(Socket);
 
 impl TcpStream {
     pub fn receive(&self, buf: &mut [u8]) -> Result<usize> {
-        self.0.receive(buf, true).map(|(size, _)| size)
+        self.0.receive(buf, true)
     }
 
     pub fn send(&self, buf: &[u8]) -> Result<usize> {
