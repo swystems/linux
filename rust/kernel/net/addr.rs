@@ -175,7 +175,8 @@ impl SocketAddr {
     /// This function is unsafe because it does not check if the address family of the contained address matches the type parameter.
     /// The function must be called with the correct type parameter.
     pub unsafe fn into_addr<T: GenericSocketAddr>(self) -> T {
-        core::ptr::read(self.as_ptr() as *const T)
+        // SAFETY: The function is called with the correct type parameter.
+        unsafe { core::ptr::read(self.as_ptr() as *const T) }
     }
 
     /// Tries to convert the object into the concrete address contained.
@@ -188,7 +189,8 @@ impl SocketAddr {
     /// assert_eq!(addr.try_into::<SocketAddrV4>(), Some(SocketAddrV4::new(Ipv4Addr::new(192, 168, 0, 1), 80)));
     pub fn try_into<T: GenericSocketAddr>(self) -> Option<T> {
         if self.family() as isize == T::family() as isize {
-            // SAFETY: The address family of the contained address matches the type parameter.
+            // SAFETY: The address family of the contained address matches the type parameter, so
+            // the address structure must be the same.
             unsafe { Some(self.into_addr()) }
         } else {
             None
