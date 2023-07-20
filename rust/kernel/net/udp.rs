@@ -1,40 +1,64 @@
 use crate::error::Result;
 use crate::net::addr::SocketAddr;
-use crate::net::socket::Socket;
+use crate::net::socket::{SockType, Socket};
+use crate::net::{AddressFamily, IpProtocol};
 
+/// A UDP socket.
+///
+/// Provides an interface to send and receive UDP packets, removing
+/// all the socket functionality that is not needed for UDP.
+///
+/// # Examples
+/// ```rust
+/// use kernel::net::udp::UdpSocket;
+/// use kernel::net::addr::*;
+///
+/// let socket = UdpSocket::new().unwrap();
+/// socket.bind(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOOPBACK, 8000))).unwrap();
+/// let mut buf = [0u8; 1024];
+/// while let Ok((len, addr)) = socket.receive(&mut buf, true) {
+///     socket.send(&buf[..len], &addr).unwrap();
+/// }
+/// ```
 pub struct UdpSocket(pub(crate) Socket);
 
 impl UdpSocket {
+    /// Creates a UDP socket.
+    /// Returns a [`UdpSocket`] on success.
     pub fn new() -> Result<Self> {
         Ok(Self(Socket::new(
-            crate::net::AddressFamily::Inet,
-            crate::net::socket::SockType::Datagram,
-            crate::net::IpProtocol::Udp,
+            AddressFamily::Inet,
+            SockType::Datagram,
+            IpProtocol::Udp,
         )?))
     }
 
+    /// Binds the socket to the given address.
     pub fn bind(&self, address: SocketAddr) -> Result {
         self.0.bind(address)
     }
 
+    /// Returns the socket's local address.
     pub fn sockname(&self) -> Result<SocketAddr> {
         self.0.sockname()
     }
 
-    pub fn peername(&self) -> Result<SocketAddr> {
-        self.0.peername()
-    }
-
-    pub fn connect(&self, address: &SocketAddr, flags: i32) -> Result {
-        self.0.connect(address, flags)
-    }
-
+    /// Receives data from another socket.
+    /// Returns the number of bytes received and the address of the sender.
+    /// If `block` is `true`, the function will block until data is received.
+    /// If `block` is `false`, the function will return immediately if no data is available.
     pub fn receive(&self, buf: &mut [u8], block: bool) -> Result<(usize, SocketAddr)> {
         self.0
             .receive_from(buf, block)
             .map(|(size, addr)| (size, addr.unwrap()))
     }
 
+    /// Sends data to another socket.
+    /// Returns the number of bytes sent.
+    ///
+    /// # Arguments
+    /// * `buf` - The data to send.
+    /// * `address` - The address of the receiver.
     pub fn send(&self, buf: &[u8], address: &SocketAddr) -> Result<usize> {
         self.0.send_to(buf, &address)
     }
