@@ -1,57 +1,124 @@
 use crate::net::AddressFamily;
 use core::fmt::Display;
 
+/// An IPv4 address.
+/// Wraps a `struct in_addr`.
 #[repr(transparent)]
 pub struct Ipv4Addr(pub(crate) bindings::in_addr);
 
 impl Ipv4Addr {
+    /// Create a new IPv4 address from four octets.
+    /// The bytes do not need to be in network order.
     pub const fn new(a: u8, b: u8, c: u8, d: u8) -> Self {
         Ipv4Addr(bindings::in_addr {
             s_addr: u32::from_ne_bytes([a.to_be(), b.to_be(), c.to_be(), d.to_be()]),
         })
     }
+
+    /// Create a new IPv4 address from an array of octets.
+    /// The bytes do not need to be in network order.
     pub const fn from(octets: [u8; 4]) -> Self {
         Self::new(octets[0], octets[1], octets[2], octets[3])
     }
+
+    /// Get the octets of the address.
+    /// The bytes are in network order.
     pub fn octets(&self) -> &[u8; 4] {
+        // SAFETY: `s_addr` is a 32-bit integer, which is 4 bytes.
         unsafe { &*(&self.0.s_addr as *const _ as *const [u8; 4]) }
     }
 
+    /// The "any" address: 0.0.0.0
+    /// Used to accept any incoming message.
     pub const ANY: Self = Self::new(0, 0, 0, 0);
+
+    /// The broadcast address: 255.255.255.255
+    /// Used to send a message to all hosts on the network.
     pub const BROADCAST: Self = Self::new(255, 255, 255, 255);
+
+    /// "None" address; can be used as return value to indicate an error.
     pub const NONE: Self = Self::new(255, 255, 255, 255);
+
+    /// A dummy address: 192.0.0.8
+    /// Used as ICMP reply source if no address is set.
     pub const DUMMY: Self = Self::new(192, 0, 0, 8);
+
+    /// The loopback address: 127.0.0.1
+    /// Used to send a message to the local host.
     pub const LOOPBACK: Self = Self::new(127, 0, 0, 1);
 }
 
 impl Display for Ipv4Addr {
+    /// Display the address as a string.
+    /// The bytes are in network order.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use kernel::net::addr::Ipv4Addr;
+    ///
+    /// let addr = Ipv4Addr::new(192, 168, 0, 1);
+    /// assert_eq!(format!("{}", addr), "192.168.0.1");
+    /// ```
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let octets = self.octets();
         write!(f, "{}.{}.{}.{}", octets[0], octets[1], octets[2], octets[3])
     }
 }
 
+/// An IPv6 address.
+/// Wraps a `struct in6_addr`.
 #[repr(transparent)]
 pub struct Ipv6Addr(pub(crate) bindings::in6_addr);
 
 impl Ipv6Addr {
+    /// Create a new IPv6 address from eight 16-bit integers.
+    /// The integers do not need to be in network order.
     pub const fn new(a: u16, b: u16, c: u16, d: u16, e: u16, f: u16, g: u16, h: u16) -> Self {
-        Self::from([a, b, c, d, e, f, g, h])
+        Self::from([
+            a.to_be(),
+            b.to_be(),
+            c.to_be(),
+            d.to_be(),
+            e.to_be(),
+            f.to_be(),
+            g.to_be(),
+            h.to_be(),
+        ])
     }
+
+    /// Create a new IPv6 address from an array of 16-bit integers.
+    /// The integers do not need to be in network order.
     pub const fn from(octets: [u16; 8]) -> Self {
         Ipv6Addr(bindings::in6_addr {
             in6_u: bindings::in6_addr__bindgen_ty_1 { u6_addr16: octets },
         })
     }
+
+    /// Get the octets of the address.
+    /// The bytes are in network order.
     pub fn octets(&self) -> &[u16; 8] {
         unsafe { &self.0.in6_u.u6_addr16 as _ }
     }
 
+    /// The "any" address: ::
+    /// Used to accept any incoming message.
     pub const ANY: Self = Self::new(0, 0, 0, 0, 0, 0, 0, 0);
+
+    /// The loopback address: ::1
+    /// Used to send a message to the local host.
     pub const LOOPBACK: Self = Self::new(0, 0, 0, 0, 0, 0, 0, 1);
 }
 
 impl Display for Ipv6Addr {
+    /// Display the address as a string.
+    /// The bytes are in network order.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use kernel::net::addr::Ipv6Addr;
+    ///
+    /// let addr = Ipv6Addr::new(0x2001, 0x0db8, 0x85a3, 0x0000, 0x0000, 0x8a2e, 0x0370, 0x7334);
+    /// assert_eq!(format!("{}", addr), "2001:db8:85a3:0:0:8a2e:370:7334");
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let octets = self.octets();
         write!(
@@ -62,46 +129,89 @@ impl Display for Ipv6Addr {
     }
 }
 
+/// A generic Socket Address. Acts like a `struct sockaddr`.
+/// The purpose of this enum is to be used as a generic parameter for functions that can take any type of address.
 pub enum SocketAddr {
+    /// An IPv4 address.
     V4(SocketAddrV4),
+    /// An IPv6 address.
     V6(SocketAddrV6),
 }
 
 impl SocketAddr {
+    /// Returns the size in bytes of the concrete address contained.
+    /// Used in the kernel functions that take a parameter with the size of the socket address.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use kernel::net::addr::{Ipv4Addr, SocketAddr, SocketAddrV4};
+    /// assert_eq!(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(192, 168, 0, 1), 80)).size(),
+    ///           core::mem::size_of::<SocketAddrV4>());
     pub fn size(&self) -> usize {
         match self {
             SocketAddr::V4(_) => SocketAddrV4::size(),
             SocketAddr::V6(_) => SocketAddrV6::size(),
         }
     }
+
+    /// Returns the address family of the concrete address contained.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use kernel::net::addr::{Ipv4Addr, SocketAddr, SocketAddrV4};
+    /// use kernel::net::AddressFamily;
+    /// assert_eq!(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(192, 168, 0, 1), 80)).family(),
+    ///          AddressFamily::Inet);
     pub fn family(&self) -> AddressFamily {
         match self {
             SocketAddr::V4(_) => AddressFamily::Inet,
             SocketAddr::V6(_) => AddressFamily::Inet6,
         }
     }
-    pub fn into_addr<T: GenericSocketAddr>(self) -> T {
-        unsafe { core::ptr::read(self.as_ptr() as *const T) }
+
+    /// Consumes the object and returns the concrete address contained.
+    ///
+    /// # Safety
+    /// This function is unsafe because it does not check if the address family of the contained address matches the type parameter.
+    /// The function must be called with the correct type parameter.
+    pub unsafe fn into_addr<T: GenericSocketAddr>(self) -> T {
+        core::ptr::read(self.as_ptr() as *const T)
     }
+
+    /// Tries to convert the object into the concrete address contained.
+    /// Returns `None` if the address family of the contained address does not match the type parameter.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use kernel::net::addr::{Ipv4Addr, SocketAddr, SocketAddrV4};
+    /// let addr = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(192, 168, 0, 1), 80));
+    /// assert_eq!(addr.try_into::<SocketAddrV4>(), Some(SocketAddrV4::new(Ipv4Addr::new(192, 168, 0, 1), 80)));
     pub fn try_into<T: GenericSocketAddr>(self) -> Option<T> {
         if self.family() as isize == T::family() as isize {
-            Some(self.into_addr())
+            // SAFETY: The address family of the contained address matches the type parameter.
+            unsafe { Some(self.into_addr()) }
         } else {
             None
         }
     }
-}
 
-impl SocketAddr {
-    pub(crate) fn as_ptr_mut(&mut self) -> *mut bindings::sockaddr {
-        self.as_ptr() as _
-    }
+    /// Returns a pointer to the C `struct sockaddr` contained.
+    /// Used in the kernel functions that take a pointer to a socket address.
     pub(crate) fn as_ptr(&self) -> *const bindings::sockaddr {
         match self {
             SocketAddr::V4(addr) => addr as *const _ as _,
             SocketAddr::V6(addr) => addr as *const _ as _,
         }
     }
+
+    /// Creates a `SocketAddr` from a C `struct sockaddr`.
+    /// The function consumes the `struct sockaddr`.
+    /// Used in the kernel functions that return a socket address.
+    ///
+    /// # Panics
+    /// Panics if the address family of the `struct sockaddr` is invalid.
+    /// This should never happen.
+    /// If it does, it is likely because of an invalid pointer.
     pub(crate) fn from_raw(sockaddr: bindings::sockaddr) -> Self {
         match sockaddr.sa_family as u32 {
             bindings::AF_INET => SocketAddr::V4(unsafe {
@@ -113,6 +223,8 @@ impl SocketAddr {
             _ => panic!("Invalid address family"),
         }
     }
+
+    /// Consumes the object and returns the C `struct sockaddr` contained.
     pub(crate) fn into_raw(self) -> bindings::sockaddr {
         match self {
             SocketAddr::V4(addr) => unsafe { core::ptr::read(&addr as *const _ as *const _) },
