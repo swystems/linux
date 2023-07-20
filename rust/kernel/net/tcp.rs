@@ -7,7 +7,7 @@ use crate::{
     },
 };
 
-pub struct TcpListener(Socket);
+pub struct TcpListener(pub(crate) Socket);
 
 impl TcpListener {
     pub fn new(address: SocketAddr) -> Result<Self> {
@@ -21,7 +21,7 @@ impl TcpListener {
     }
 }
 
-pub struct TcpStream(Socket);
+pub struct TcpStream(pub(crate) Socket);
 
 impl TcpStream {
     pub fn receive(&self, buf: &mut [u8]) -> Result<usize> {

@@ -1,3 +1,5 @@
+pub mod opts;
+
 use super::*;
 use crate::error::{to_result, Result};
 use crate::net::addr::*;
@@ -170,6 +172,32 @@ impl Socket {
         message.msg_name = address.as_ptr() as _;
         message.msg_namelen = address.size() as _;
         self.send_msg(bytes, message)
+    }
+
+    pub fn set_option<T>(&self, level: opts::Level, option: opts::Options, value: T) -> Result
+    where
+        T: Sized,
+    {
+        let value_ptr = &value as *const T as *mut T;
+        let bf = bindings::__BindgenBitfieldUnit::<[u8; 1usize]>::new([1; 1usize]);
+        let sockptr = bindings::sockptr_t {
+            __bindgen_anon_1: bindings::sockptr_t__bindgen_ty_1 {
+                kernel: value_ptr as _,
+            },
+            _bitfield_align_1: [0; 0],
+            _bitfield_1: bf,
+            __bindgen_padding_0: [0; 7],
+        };
+        let value_size = core::mem::size_of::<T>();
+        unsafe {
+            to_result(bindings::sock_setsockopt(
+                self.0,
+                level as _,
+                option.to_value() as _,
+                sockptr,
+                value_size as _,
+            ))
+        }
     }
 }
 

@@ -2,7 +2,7 @@ use crate::error::Result;
 use crate::net::addr::SocketAddr;
 use crate::net::socket::Socket;
 
-pub struct UdpSocket(Socket);
+pub struct UdpSocket(pub(crate) Socket);
 
 impl UdpSocket {
     pub fn new() -> Result<Self> {
