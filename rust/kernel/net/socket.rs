@@ -89,13 +89,14 @@ pub enum ShutdownCmd {
 /// }
 /// ```
 ///
-/// # Safety
-/// The socket pointer must be valid for the lifetime of the wrapper.
+/// # Invariants
+///
+/// The socket pointer is valid for the lifetime of the wrapper.
 #[repr(transparent)]
 pub struct Socket(*mut bindings::socket);
 
 impl Socket {
-    /// Private utility function to create a new socket.
+    /// Private utility function to create a new socket by calling a function.
     /// The function is generic over the creation function.
     ///
     /// # Arguments
