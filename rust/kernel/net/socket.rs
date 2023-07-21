@@ -1,8 +1,22 @@
-pub mod opts;
+// SPDX-License-Identifier: GPL-2.0
+
+//! Socket API.
+//!
+//! This module contains the Socket layer kernel APIs that have been wrapped for usage by Rust code
+//! in the kernel.
+//!
+//! C library: [`include/linux/socket.h`](../../include/linux/socket.h)
+//!
+//! This API is inspired by the Rust std::net Socket API, but is not a direct port.
+//! The main difference is that the Rust std::net API is designed for user-space, while this API
+//! is designed for kernel-space.
+//! Rust net API: <https://doc.rust-lang.org/std/net/index.html>
 
 use super::*;
 use crate::error::{to_result, Result};
 use crate::net::addr::*;
+
+pub mod opts;
 
 /// The socket type.
 pub enum SockType {

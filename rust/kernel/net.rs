@@ -1,12 +1,17 @@
+// SPDX-License-Identifier: GPL-2.0
+
+//! Network subsystem.
+//!
+//! This module contains the kernel APIs related to networking that have been ported or wrapped for
+//! usage by Rust code in the kernel.
+//!
+//! C library: [`include/linux/net.h`](../../include/linux/net.h)
+
 use core::cell::UnsafeCell;
 
-/// Contains the address types.
 pub mod addr;
-/// Contains the socket type and related types.
 pub mod socket;
-/// Contains TCP-related types.
 pub mod tcp;
-/// Contains UDP-related types.
 pub mod udp;
 
 /// The address family.

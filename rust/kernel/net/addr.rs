@@ -1,3 +1,11 @@
+// SPDX-License-Identifier: GPL-2.0
+
+//! Network address types.
+//!
+//! This module contains the types and APIs related to network addresses.
+//! The methods and types of this API are inspired by the [Rust standard library's `std::net` module](https://doc.rust-lang.org/std/net/index.html),
+//! but have been ported to use the kernel's C APIs.
+
 use crate::net::AddressFamily;
 use core::fmt::Display;
 

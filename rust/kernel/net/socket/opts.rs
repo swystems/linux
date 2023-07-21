@@ -1,3 +1,13 @@
+// SPDX-License-Identifier: GPL-2.0
+
+//! Socket options.
+//!
+//! This module contains the types related to socket options.
+//! It is meant to be used together with the [`Socket`](kernel::net::socket::Socket) type.
+//!
+//! Currently, only a subset of the socket options are supported, because some of them
+//! require specific structures, that must be ported to Rust before they can be used.
+
 use kernel::bindings;
 
 /// Options level to retrieve and set socket options.

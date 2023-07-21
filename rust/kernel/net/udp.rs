@@ -1,3 +1,12 @@
+// SPDX-License-Identifier: GPL-2.0
+
+//! UDP socket wrapper.
+//!
+//! This module contains wrappers for a UDP Socket ([`UdpSocket`]).
+//! The wrapper is just convenience structs around the generic [`Socket`] type.
+//!
+//! The API is inspired by the Rust standard library's [`UdpSocket`](https://doc.rust-lang.org/std/net/struct.UdpSocket.html).
+
 use crate::error::Result;
 use crate::net::addr::SocketAddr;
 use crate::net::socket::{SockType, Socket};

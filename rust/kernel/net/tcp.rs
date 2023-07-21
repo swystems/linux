@@ -1,11 +1,17 @@
-use crate::{
-    error::Result,
-    net::{
-        addr::SocketAddr,
-        socket::{ShutdownCmd, SockType, Socket},
-        AddressFamily, IpProtocol,
-    },
-};
+// SPDX-License-Identifier: GPL-2.0
+
+//! TCP socket wrapper.
+//!
+//! This module contains wrappers for a TCP Socket ([`TcpListener`]) and an active
+//! TCP connection ([`TcpStream`]).
+//! The wrappers are just convenience structs around the generic [`Socket`] type.
+//!
+//! The API is inspired by the Rust standard library's [`TcpListener`](https://doc.rust-lang.org/std/net/struct.TcpListener.html) and [`TcpStream`](https://doc.rust-lang.org/std/net/struct.TcpStream.html).
+
+use crate::error::Result;
+use crate::net::addr::SocketAddr;
+use crate::net::socket::{ShutdownCmd, SockType, Socket};
+use crate::net::{AddressFamily, IpProtocol};
 
 /// A TCP listener.
 /// Wraps the [`Socket`] type to create a TCP-specific interface.
