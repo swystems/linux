@@ -365,14 +365,19 @@ impl Socket {
     /// The generic type `T` is used as the type of the value to set.
     ///
     /// # Arguments
-    /// * `level`: The [Level](opts::Level) of the option.
+    /// * `level`: The [Level](opts::OptionsLevel) of the option.
     /// * `option`: The [Options](opts::Options) to set.
     /// * `value`: The value to set.
     ///
     /// # Safety
     /// The caller must ensure that the generic type `T` matches the type of the option.
     /// The list of types for each enum is in the [options file](opts).
-    pub fn set_option<T>(&self, level: opts::Level, option: opts::Options, value: T) -> Result
+    pub fn set_option<T>(
+        &self,
+        level: opts::OptionsLevel,
+        option: opts::Options,
+        value: T,
+    ) -> Result
     where
         T: Sized,
     {

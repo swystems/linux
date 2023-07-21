@@ -279,21 +279,13 @@ pub enum SocketOptions {
     /// Rust value type: `bool`
     Debug = bindings::SO_DEBUG as isize,
 
-    /// Remove classic BPF program from the socket.
+    /// Remove classic BPF or eBPF program from the socket.
     /// The argument is ignored.
     ///
     /// C value type: `int`
     ///
     /// Rust value type: `bool`
     DetachFilter = bindings::SO_DETACH_FILTER as isize,
-
-    /// Remove eBPF program from the socket.
-    /// The argument is ignored.
-    ///
-    /// C value type: `int`
-    ///
-    /// Rust value type: `bool`
-    DetachBpf = bindings::SO_DETACH_BPF as isize,
 
     /// Get the domain of the socket. Read-only.
     ///
@@ -438,30 +430,34 @@ pub enum SocketOptions {
     /// C value type: `int`
     ///
     /// Rust value type: `u32`
-    RecvLowLatency = bindings::SO_RECV_LOW_LATENCY as isize,
+    RecvLowLatency = bindings::SO_RCVLOWAT as isize,
 
     /// Set or get the minimum number of bytes to process for socket send operations.
     ///
     /// C value type: `int`
     ///
     /// Rust value type: `u32`
-    SendLowLatency = bindings::SO_SEND_LOW_LATENCY as isize,
+    SendLowLatency = bindings::SO_SNDLOWAT as isize,
 
     /// Set or get the receive timeout value.
     ///
     /// C value type: `struct timeval`
     ///
     /// Rust value type: unimplemented
+    ///
+    /// TODO: Understand how to use the _NEW/_OLD values
     #[non_exhaustive]
-    RecvTimeo = bindings::SO_RCVTIMEO as isize,
+    RecvTimeo = bindings::SO_RCVTIMEO_NEW as isize,
 
     /// Set or get the send timeout value.
     ///
     /// C value type: `struct timeval`
     ///
     /// Rust value type: unimplemented
+    ///
+    /// TODO: Understand how to use the _NEW/_OLD values
     #[non_exhaustive]
-    SendTimeo = bindings::SO_SNDTIMEO as isize,
+    SendTimeo = bindings::SO_SNDTIMEO_NEW as isize,
 
     /// Bind should allow reuse of local addresses.
     ///
@@ -506,7 +502,9 @@ pub enum SocketOptions {
     /// C value type: `int`
     ///
     /// Rust value type: `bool`
-    Timestamp = bindings::SO_TIMESTAMP as isize,
+    ///
+    /// TODO: Understand how to use the _NEW/_OLD values
+    Timestamp = bindings::SO_TIMESTAMP_NEW as isize,
 
     /// Set the receiving of the timestamp control message.
     /// The message is a `struct timespec`.
@@ -514,7 +512,9 @@ pub enum SocketOptions {
     /// C value type: `int`
     ///
     /// Rust value type: `bool`
-    TimestampNs = bindings::SO_TIMESTAMPNS as isize,
+    ///
+    /// TODO: Understand how to use the _NEW/_OLD values
+    TimestampNs = bindings::SO_TIMESTAMPNS_NEW as isize,
 
     /// Get the socket type (e.g. `SOCK_STREAM`). Read-only.
     ///
@@ -699,7 +699,7 @@ pub enum RawOptions {
     ///
     /// Rust value type: `IcmpFilter`
     #[non_exhaustive]
-    Filter = bindings::ICMP_FILTER as isize,
+    Filter = bindings::ICMPV6_FILTER as isize,
 }
 
 /// TCP socket options.
@@ -879,7 +879,7 @@ impl Options {
             Options::IpOptions(_) => OptionsLevel::Ip,
             Options::SocketOptions(_) => OptionsLevel::Socket,
             Options::Ipv6Options(_) => OptionsLevel::Ipv6,
-            Options::RawOptions(_) => OptionsLevel::Icmpv6,
+            Options::RawOptions(_) => OptionsLevel::Raw,
             Options::TcpOptions(_) => OptionsLevel::Tcp,
         }
     }
