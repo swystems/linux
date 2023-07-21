@@ -162,6 +162,7 @@ impl SocketAddr {
     /// use kernel::net::AddressFamily;
     /// assert_eq!(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(192, 168, 0, 1), 80)).family(),
     ///          AddressFamily::Inet);
+    /// ```
     pub fn family(&self) -> AddressFamily {
         match self {
             SocketAddr::V4(_) => AddressFamily::Inet,
@@ -172,6 +173,7 @@ impl SocketAddr {
     /// Consumes the object and returns the concrete address contained.
     ///
     /// # Safety
+    ///
     /// This function is unsafe because it does not check if the address family of the contained address matches the type parameter.
     /// The function must be called with the correct type parameter.
     pub unsafe fn into_addr<T: GenericSocketAddr>(self) -> T {
@@ -225,36 +227,85 @@ impl SocketAddr {
             _ => panic!("Invalid address family"),
         }
     }
-
-    /// Consumes the object and returns the C `struct sockaddr` contained.
-    pub(crate) fn into_raw(self) -> bindings::sockaddr {
-        match self {
-            SocketAddr::V4(addr) => unsafe { core::ptr::read(&addr as *const _ as *const _) },
-            SocketAddr::V6(addr) => unsafe { core::ptr::read(&addr as *const _ as *const _) },
-        }
-    }
 }
 
+/// Generic trait for socket addresses.
+///
+/// The purpose of this trait is:
+/// - To force all socket addresses to have a size and an address family.
+/// - To allow the conversion of a `SocketAddr` into a concrete address.
 pub trait GenericSocketAddr: Copy {
+    /// Returns the size in bytes of the concrete address.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use kernel::bindings;
+    /// use kernel::net::addr::{GenericSocketAddr, Ipv4Addr, SocketAddr, SocketAddrV4};
+    /// assert_eq!(SocketAddrV4::size(), core::mem::size_of::<bindings::sockaddr_in>());
+    /// ```
     fn size() -> usize
     where
         Self: Sized,
     {
         core::mem::size_of::<Self>()
     }
+
+    /// Returns the address family of the concrete address.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use kernel::net::addr::{GenericSocketAddr, SocketAddrV4};
+    /// use kernel::net::AddressFamily;
+    /// assert_eq!(SocketAddrV4::family(), AddressFamily::Inet);
+    /// ```
     fn family() -> AddressFamily;
 }
 
+/// Trait for socket addresses that contain an IP address and a port.
+///
+/// This trait is implemented by [SocketAddrV4] and [SocketAddrV6].
 pub trait SocketAddressInfo<T> {
+    /// Returns a reference to the IP address contained.
+    /// The type of the IP address is the type parameter of the trait.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use kernel::net::addr::{Ipv4Addr, SocketAddr, SocketAddressInfo, SocketAddrV4};
+    /// let addr = SocketAddrV4::new(Ipv4Addr::new(192, 168, 0, 1), 80);
+    /// assert_eq!(addr.address(), &Ipv4Addr::new(192, 168, 0, 1));
+    /// ```
     fn address(&self) -> &T;
+
+    /// Returns the port contained. The port is in network byte order.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use kernel::net::addr::{Ipv4Addr, SocketAddr, SocketAddressInfo, SocketAddrV4};
+    /// let addr = SocketAddrV4::new(Ipv4Addr::new(192, 168, 0, 1), 80);
+    /// assert_eq!(addr.port(), 80);
+    /// ```
     fn port(&self) -> u16;
 }
 
+/// IPv4 socket address.
+/// Wraps a C `struct sockaddr_in`.
+///
+/// # Examples
+/// ```rust
+/// use kernel::bindings;
+/// use kernel::net::addr::{GenericSocketAddr, Ipv4Addr, SocketAddr, SocketAddressInfo, SocketAddrV4};
+/// let addr = SocketAddrV4::new(Ipv4Addr::new(192, 168, 0, 1), 80);
+/// assert_eq!(addr.address(), &Ipv4Addr::new(192, 168, 0, 1));
+/// assert_eq!(SocketAddrV4::size(), core::mem::size_of::<bindings::sockaddr_in>());
+/// ```
 #[repr(transparent)]
 #[derive(Copy, Clone)]
 pub struct SocketAddrV4(pub(crate) bindings::sockaddr_in);
 
 impl SocketAddrV4 {
+    /// Creates a new IPv4 socket address from an IP address and a port.
+    /// The port does not need to be in network byte order.
     pub fn new(addr: Ipv4Addr, port: u16) -> Self {
         Self(bindings::sockaddr_in {
             sin_family: bindings::AF_INET as u16,
@@ -266,26 +317,48 @@ impl SocketAddrV4 {
 }
 
 impl GenericSocketAddr for SocketAddrV4 {
+    /// Returns the family of the address.
+    ///
+    /// # Invariants
+    /// The family is always [AddressFamily::Inet].
     fn family() -> AddressFamily {
         AddressFamily::Inet
     }
 }
 
 impl SocketAddressInfo<Ipv4Addr> for SocketAddrV4 {
+    /// Returns a reference to the IP address contained.
+    /// The type of the IP address is [Ipv4Addr].
     fn address(&self) -> &Ipv4Addr {
+        // SAFETY: The [Ipv4Addr] is a transparent representation of the C `struct in_addr`,
+        // which is the type of `sin_addr`. Therefore, the conversion is safe.
         unsafe { &*(&self.0.sin_addr as *const _ as *const Ipv4Addr) }
     }
 
+    /// Returns the port contained. The port is in network byte order.
     fn port(&self) -> u16 {
         self.0.sin_port.to_be()
     }
 }
 
+/// IPv6 socket address.
+/// Wraps a C `struct sockaddr_in6`.
+///
+/// # Examples
+/// ```rust
+/// use kernel::bindings;
+/// use kernel::net::addr::{GenericSocketAddr, Ipv6Addr, SocketAddr, SocketAddressInfo, SocketAddrV6};
+///
+/// let addr = SocketAddrV6::new(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1), 80, 0, 0);
+/// assert_eq!(addr.address(), &Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1));
+/// assert_eq!(SocketAddrV6::size(), core::mem::size_of::<bindings::sockaddr_in6>());
 #[repr(transparent)]
 #[derive(Copy, Clone)]
 pub struct SocketAddrV6(pub(crate) bindings::sockaddr_in6);
 
 impl SocketAddrV6 {
+    /// Creates a new IPv6 socket address from an IP address, a port, a flowinfo and a scope_id.
+    /// The port does not need to be in network byte order.
     pub fn new(addr: Ipv6Addr, port: u16, flowinfo: u32, scope_id: u32) -> Self {
         Self(bindings::sockaddr_in6 {
             sin6_family: bindings::AF_INET6 as u16,
@@ -298,16 +371,25 @@ impl SocketAddrV6 {
 }
 
 impl GenericSocketAddr for SocketAddrV6 {
+    /// Returns the family of the address.
+    ///
+    /// # Invariants
+    /// The family is always [AddressFamily::Inet6].
     fn family() -> AddressFamily {
         AddressFamily::Inet6
     }
 }
 
 impl SocketAddressInfo<Ipv6Addr> for SocketAddrV6 {
+    /// Returns a reference to the IP address contained.
+    /// The type of the IP address is [Ipv6Addr].
     fn address(&self) -> &Ipv6Addr {
+        // SAFETY: The [Ipv6Addr] is a transparent representation of the C `struct in6_addr`,
+        // which is the type of `sin6_addr`. Therefore, the conversion is safe.
         unsafe { &*(&self.0.sin6_addr as *const _ as *const Ipv6Addr) }
     }
 
+    /// Returns the port contained. The port is in network byte order.
     fn port(&self) -> u16 {
         self.0.sin6_port.to_be()
     }
