@@ -882,9 +882,9 @@ impl Options {
     /// ```
     /// use kernel::net::socket::opts::{Options, OptionsLevel, IpOptions};
     /// let opt = Options::IpOptions(IpOptions::AddMembership);
-    /// assert_eq!(opt.to_level(), OptionsLevel::Ip);
+    /// assert_eq!(opt.as_level(), OptionsLevel::Ip);
     /// ```
-    pub fn to_level(self) -> OptionsLevel {
+    pub fn as_level(&self) -> OptionsLevel {
         match self {
             Options::IpOptions(_) => OptionsLevel::Ip,
             Options::SocketOptions(_) => OptionsLevel::Socket,
