@@ -10,6 +10,7 @@
 
 use crate::error::Result;
 use crate::net::addr::SocketAddr;
+use crate::net::socket::flags::{ReceiveFlag, SendFlag};
 use crate::net::socket::{ShutdownCmd, SockType, Socket};
 use crate::net::{AddressFamily, IpProtocol};
 
@@ -54,6 +55,9 @@ pub struct TcpStream(pub(crate) Socket);
 
 impl TcpStream {
     /// Receive data from the stream.
+    /// The given flags are used to modify the behavior of the receive operation.
+    /// See [`ReceiveFlag`] for more.
+    ///
     /// Returns the number of bytes received.
     ///
     /// # Examples
@@ -64,16 +68,23 @@ impl TcpStream {
     /// let listener = TcpListener::new(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOOPBACK, 8000))).unwrap();
     /// while let Ok(stream) = listener.accept() {
     ///     let mut buf = [0u8; 1024];
-    ///     while let Ok(len) = stream.receive(&mut buf) {
+    ///     while let Ok(len) = stream.receive(&mut buf, []) {
     ///         // ...
     ///     }
     /// }
     /// ```
-    pub fn receive(&self, buf: &mut [u8]) -> Result<usize> {
-        self.0.receive(buf, true)
+    pub fn receive(
+        &self,
+        buf: &mut [u8],
+        flags: impl IntoIterator<Item = ReceiveFlag>,
+    ) -> Result<usize> {
+        self.0.receive(buf, flags)
     }
 
     /// Send data to the stream.
+    /// The given flags are used to modify the behavior of the send operation.
+    /// See [`SendFlag`] for more.
+    ///
     /// Returns the number of bytes sent.
     ///
     /// # Examples
@@ -84,12 +95,12 @@ impl TcpStream {
     /// let listener = TcpListener::new(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOOPBACK, 8000))).unwrap();
     /// while let Ok(stream) = listener.accept() {
     ///     let mut buf = [0u8; 1024];
-    ///     while let Ok(len) = stream.receive(&mut buf) {
-    ///         stream.send(&buf[..len])?;
+    ///     while let Ok(len) = stream.receive(&mut buf, []) {
+    ///         stream.send(&buf[..len], [])?;
     ///     }
     /// }
-    pub fn send(&self, buf: &[u8]) -> Result<usize> {
-        self.0.send(buf)
+    pub fn send(&self, buf: &[u8], flags: impl IntoIterator<Item = SendFlag>) -> Result<usize> {
+        self.0.send(buf, flags)
     }
 }
 

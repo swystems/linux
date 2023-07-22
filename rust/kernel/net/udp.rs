@@ -9,6 +9,7 @@
 
 use crate::error::Result;
 use crate::net::addr::SocketAddr;
+use crate::net::socket::flags::{ReceiveFlag, SendFlag};
 use crate::net::socket::{SockType, Socket};
 use crate::net::{AddressFamily, IpProtocol};
 
@@ -25,8 +26,8 @@ use crate::net::{AddressFamily, IpProtocol};
 /// let socket = UdpSocket::new().unwrap();
 /// socket.bind(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOOPBACK, 8000))).unwrap();
 /// let mut buf = [0u8; 1024];
-/// while let Ok((len, addr)) = socket.receive(&mut buf, true) {
-///     socket.send(&buf[..len], &addr).unwrap();
+/// while let Ok((len, addr)) = socket.receive(&mut buf, []) {
+///     socket.send(&buf[..len], &addr, []).unwrap();
 /// }
 /// ```
 pub struct UdpSocket(pub(crate) Socket);
@@ -53,22 +54,31 @@ impl UdpSocket {
     }
 
     /// Receives data from another socket.
+    /// The given flags are used to modify the behavior of the receive operation.
+    /// See [`ReceiveFlag`] for more.
+    ///
     /// Returns the number of bytes received and the address of the sender.
-    /// If `block` is `true`, the function will block until data is received.
-    /// If `block` is `false`, the function will return immediately if no data is available.
-    pub fn receive(&self, buf: &mut [u8], block: bool) -> Result<(usize, SocketAddr)> {
+    pub fn receive(
+        &self,
+        buf: &mut [u8],
+        flags: impl IntoIterator<Item = ReceiveFlag>,
+    ) -> Result<(usize, SocketAddr)> {
         self.0
-            .receive_from(buf, block)
+            .receive_from(buf, flags)
             .map(|(size, addr)| (size, addr.unwrap()))
     }
 
     /// Sends data to another socket.
-    /// Returns the number of bytes sent.
+    /// The given flags are used to modify the behavior of the send operation.
+    /// See [`SendFlag`] for more.
     ///
-    /// # Arguments
-    /// * `buf` - The data to send.
-    /// * `address` - The address of the receiver.
-    pub fn send(&self, buf: &[u8], address: &SocketAddr) -> Result<usize> {
-        self.0.send_to(buf, &address)
+    /// Returns the number of bytes sent.
+    pub fn send(
+        &self,
+        buf: &[u8],
+        address: &SocketAddr,
+        flags: impl IntoIterator<Item = SendFlag>,
+    ) -> Result<usize> {
+        self.0.send_to(buf, &address, flags)
     }
 }

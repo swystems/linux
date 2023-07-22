@@ -18,7 +18,9 @@ use crate::net::addr::*;
 use core::cmp::max;
 use core::marker::PhantomData;
 use core::mem::MaybeUninit;
+use flags::*;
 
+pub mod flags;
 pub mod opts;
 
 /// The socket type.
@@ -73,8 +75,8 @@ pub enum ShutdownCmd {
 /// socket.listen(10)?;
 /// while let Ok(peer) = socket.accept(true) {
 ///     let mut buf = [0u8; 1024];
-///     peer.receive(&mut buf, true)?;
-///     peer.send(&buf)?;
+///     peer.receive(&mut buf, [])?;
+///     peer.send(&buf, [])?;
 /// }
 /// ```
 /// A simple UDP echo server:
@@ -86,9 +88,9 @@ pub enum ShutdownCmd {
 /// let socket = Socket::new_kern(init_ns(), AddressFamily::Inet, SockType::Datagram, IpProtocol::Udp)?;///
 /// socket.bind(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOOPBACK, 8000)))?;
 /// let mut buf = [0u8; 1024];
-/// while let Ok((len, sender_opt)) = socket.receive_from(&mut buf, true) {
+/// while let Ok((len, sender_opt)) = socket.receive_from(&mut buf, []) {
 ///     let sender: SocketAddr = sender_opt.expect("Sender address is always available for UDP");
-///     socket.send_to(&buf[..len], &sender)?;
+///     socket.send_to(&buf[..len], &sender, [])?;
 /// }
 /// ```
 ///
@@ -272,11 +274,12 @@ impl Socket {
     ///
     /// # Arguments
     /// * `bytes`: The buffer to read the data into.
-    /// * `block`: Whether to block until data is available.
+    /// * `flags`: The flags to use for the receive operation.
+    ///            See the [flags module](flags) for more.
     pub fn receive_from(
         &self,
         bytes: &mut [u8],
-        block: bool,
+        flags: impl IntoIterator<Item = ReceiveFlag>,
     ) -> Result<(usize, Option<SocketAddr>)> {
         // SAFETY: An uninitialized address is a valid field value for `msghdr`.
         let addr: bindings::sockaddr = unsafe { core::mem::zeroed() };
@@ -290,11 +293,6 @@ impl Socket {
             iov_base: bytes.as_mut_ptr() as _,
             iov_len: bytes.len() as _,
         };
-        let flags: i32 = if block {
-            0
-        } else {
-            bindings::MSG_DONTWAIT as _
-        };
 
         // SAFETY: FFI call; the socket address is valid for the lifetime of the wrapper.
         let size = unsafe {
@@ -304,7 +302,7 @@ impl Socket {
                 &mut vec,
                 1,
                 bytes.len() as _,
-                flags as _,
+                flags_value(flags) as _,
             )
         };
         to_result(size)?;
@@ -322,8 +320,12 @@ impl Socket {
     /// Receives data from a remote socket and returns only the bytes read.
     /// Wraps the `kernel_recvmsg` function.
     /// Used by connection-oriented sockets, where the sender address is the connected peer.
-    pub fn receive(&self, bytes: &mut [u8], block: bool) -> Result<usize> {
-        let (size, _) = self.receive_from(bytes, block)?;
+    pub fn receive(
+        &self,
+        bytes: &mut [u8],
+        flags: impl IntoIterator<Item = ReceiveFlag>,
+    ) -> Result<usize> {
+        let (size, _) = self.receive_from(bytes, flags)?;
         Ok(size)
     }
 
@@ -335,11 +337,19 @@ impl Socket {
     /// # Arguments
     /// * `bytes`: The buffer to send.
     /// * `message`: The raw `msghdr` to use.
-    pub(crate) fn send_msg(&self, bytes: &[u8], message: bindings::msghdr) -> Result<usize> {
+    /// * `flags`: The flags to use for the send operation.
+    ///            See the [flags module](flags) for more.
+    pub(crate) fn send_msg(
+        &self,
+        bytes: &[u8],
+        mut message: bindings::msghdr,
+        flags: impl IntoIterator<Item = SendFlag>,
+    ) -> Result<usize> {
         let mut vec = bindings::kvec {
             iov_base: bytes.as_ptr() as _,
             iov_len: bytes.len() as _,
         };
+        message.msg_flags = flags_value(flags) as _;
 
         // SAFETY: FFI call; the address is valid for the lifetime of the wrapper.
         let size = unsafe {
@@ -358,9 +368,9 @@ impl Socket {
     /// Sends a message to a remote socket and returns the bytes sent.
     /// Wraps the `kernel_sendmsg` function.
     /// Used by connection-oriented sockets, as they don't need to specify the destination address.
-    pub fn send(&self, bytes: &[u8]) -> Result<usize> {
+    pub fn send(&self, bytes: &[u8], flags: impl IntoIterator<Item = SendFlag>) -> Result<usize> {
         // SAFETY: An uninitialized msghdr is a valid input for `kernel_sendmsg`.
-        self.send_msg(bytes, unsafe { core::mem::zeroed() })
+        self.send_msg(bytes, unsafe { core::mem::zeroed() }, flags)
     }
 
     /// Sends a message to a specific remote socket address and returns the bytes sent.
@@ -370,12 +380,19 @@ impl Socket {
     /// # Arguments
     /// * `bytes`: The buffer to send.
     /// * `address`: The address to send the message to.
-    pub fn send_to(&self, bytes: &[u8], address: &SocketAddr) -> Result<usize> {
+    /// * `flags`: The flags to use for the send operation.
+    ///            See the [flags module](flags) for more.
+    pub fn send_to(
+        &self,
+        bytes: &[u8],
+        address: &SocketAddr,
+        flags: impl IntoIterator<Item = SendFlag>,
+    ) -> Result<usize> {
         // SAFETY: An uninitialized msghdr is a valid input for `kernel_sendmsg`.
         let mut message: bindings::msghdr = unsafe { core::mem::zeroed() };
         message.msg_name = address.as_ptr() as _;
         message.msg_namelen = address.size() as _;
-        self.send_msg(bytes, message)
+        self.send_msg(bytes, message, flags)
     }
 
     /// Sets an option on the socket.
