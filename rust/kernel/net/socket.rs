@@ -15,6 +15,9 @@
 use super::*;
 use crate::error::{to_result, Result};
 use crate::net::addr::*;
+use core::cmp::max;
+use core::marker::PhantomData;
+use core::mem::MaybeUninit;
 
 pub mod opts;
 
@@ -380,46 +383,76 @@ impl Socket {
     /// The generic type `T` is used as the type of the value to set.
     ///
     /// # Arguments
-    /// * `level`: The [Level](opts::OptionsLevel) of the option.
-    /// * `option`: The [Options](opts::Options) to set.
+    /// * `option`: The [Options](opts::Options) to set. Automatically implies both the level
+    /// and the name of the option.
     /// * `value`: The value to set.
     ///
     /// # Safety
     /// The caller must ensure that the generic type `T` matches the type of the option.
-    /// The list of types for each enum is in the [options file](opts).
-    pub fn set_option<T>(
-        &self,
-        level: opts::OptionsLevel,
-        option: opts::Options,
-        value: T,
-    ) -> Result
+    /// The type of each option is specified in the [options module](opts).
+    pub fn set_option<T>(&self, option: opts::Options, value: T) -> Result
     where
         T: Sized,
     {
-        let value_ptr = &value as *const T as *mut T;
-        let bf = bindings::__BindgenBitfieldUnit::<[u8; 1usize]>::new([1; 1usize]);
-        let sockptr = bindings::sockptr_t {
-            __bindgen_anon_1: bindings::sockptr_t__bindgen_ty_1 {
-                kernel: value_ptr as _,
-            },
-            _bitfield_align_1: [0; 0],
-            _bitfield_1: bf,
-            __bindgen_padding_0: [0; 7],
-        };
-        let value_size = core::mem::size_of::<T>();
+        let value_ptr = SockPtr::new(&value);
+        let min_size = core::mem::size_of::<core::ffi::c_int>();
+        let size = max(core::mem::size_of::<T>(), min_size);
 
         // SAFETY: FFI call;
-        //         The address is valid for the lifetime of the wrapper;
-        //         The generic type matches the option.
-        unsafe {
-            to_result(bindings::sock_setsockopt(
+        // the address is valid for the lifetime of the wrapper;
+        // the size is at least the size of an integer;
+        // the level and name of the option are valid.
+        to_result(unsafe {
+            bindings::sock_setsockopt(
                 self.0,
-                level as _,
+                option.as_level() as _,
                 option.to_value() as _,
-                sockptr,
-                value_size as _,
-            ))
-        }
+                value_ptr.to_raw() as _,
+                size as _,
+            )
+        })
+    }
+
+    /// Gets an option from the socket.
+    /// Wraps the `sock_getsockopt` function.
+    /// The generic type `T` is used as the type of the value to get.
+    ///
+    /// # Arguments
+    /// * `option`: The [Options](opts::Options) to get. Automatically implies both the level
+    /// and the name of the option.
+    /// * `value`: The value to get.
+    ///
+    /// # Safety
+    /// The caller must ensure that the generic type `T` matches the type of the option.
+    /// The type of each option is specified in the [options module](opts).
+    ///
+    /// TODO: The functions `sk_getsockopt` and `sock_getsockopt` are not exported by the kernel.
+    /// Find a way to retrieve the socket options without using those functions.
+    pub fn get_option<T>(&self, option: opts::Options) -> Result<T>
+    where
+        T: Sized,
+    {
+        let value = MaybeUninit::<T>::uninit();
+        let value_ptr = SockPtr::new_from_ptr(value.as_ptr() as _);
+
+        let min_size = core::mem::size_of::<core::ffi::c_int>();
+        let size = max(core::mem::size_of::<T>(), min_size);
+        let size_ptr = SockPtr::new(&size);
+
+        // SAFETY: FFI call;
+        // the address is valid for the lifetime of the wrapper;
+        // the size is at least the size of an integer;
+        // the level and name of the option are valid.
+        to_result(unsafe {
+            bindings::sk_getsockopt(
+                (*self.0).sk,
+                option.as_level() as _,
+                option.to_value() as _,
+                value_ptr.to_raw() as _,
+                size_ptr.to_raw() as _,
+            )
+        })?;
+        Ok(unsafe { value.assume_init() })
     }
 }
 
@@ -431,5 +464,45 @@ impl Drop for Socket {
         unsafe {
             bindings::sock_release(self.0);
         }
+    }
+}
+
+#[derive(Clone, Copy)]
+#[repr(transparent)]
+struct SockPtr<'a>(bindings::sockptr_t, PhantomData<&'a ()>);
+
+impl<'a> SockPtr<'a> {
+    fn new<'b: 'a, T>(value: &'b T) -> Self
+    where
+        T: Sized,
+    {
+        let bf = bindings::__BindgenBitfieldUnit::<[u8; 1usize]>::new([1; 1usize]);
+        let sockptr = bindings::sockptr_t {
+            __bindgen_anon_1: bindings::sockptr_t__bindgen_ty_1 {
+                kernel: value as *const T as _,
+            },
+            _bitfield_align_1: [0; 0],
+            _bitfield_1: bf,
+            __bindgen_padding_0: [0; 7],
+        };
+        SockPtr(sockptr, PhantomData)
+    }
+
+    fn new_from_ptr<T>(value: *const T) -> Self
+    where
+        T: Sized,
+    {
+        let bf = bindings::__BindgenBitfieldUnit::<[u8; 1usize]>::new([1; 1usize]);
+        let sockptr = bindings::sockptr_t {
+            __bindgen_anon_1: bindings::sockptr_t__bindgen_ty_1 { kernel: value as _ },
+            _bitfield_align_1: [0; 0],
+            _bitfield_1: bf,
+            __bindgen_padding_0: [0; 7],
+        };
+        SockPtr(sockptr, PhantomData)
+    }
+
+    fn to_raw(self) -> bindings::sockptr_t {
+        self.0
     }
 }
