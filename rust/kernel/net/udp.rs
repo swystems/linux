@@ -10,7 +10,7 @@
 use crate::error::Result;
 use crate::net::addr::SocketAddr;
 use crate::net::socket::flags::{ReceiveFlag, SendFlag};
-use crate::net::socket::{SockType, Socket};
+use crate::net::socket::{opts, SockType, Socket};
 use crate::net::{AddressFamily, IpProtocol};
 
 /// A UDP socket.
@@ -26,8 +26,8 @@ use crate::net::{AddressFamily, IpProtocol};
 /// let socket = UdpSocket::new().unwrap();
 /// socket.bind(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOOPBACK, 8000))).unwrap();
 /// let mut buf = [0u8; 1024];
-/// while let Ok((len, addr)) = socket.receive(&mut buf, []) {
-///     socket.send(&buf[..len], &addr, []).unwrap();
+/// while let Ok((len, addr)) = socket.receive_from(&mut buf, []) {
+///     socket.send_to(&buf[..len], &addr, []).unwrap();
 /// }
 /// ```
 pub struct UdpSocket(pub(crate) Socket);
@@ -49,8 +49,39 @@ impl UdpSocket {
     }
 
     /// Returns the socket's local address.
+    ///
+    /// This function assumes the socket is bound,
+    /// i.e. it must be called after [`bind()`](UdpSocket::bind).
+    ///
+    /// # Examples
+    /// ```rust
+    /// use kernel::net::udp::UdpSocket;
+    /// use kernel::net::addr::*;
+    ///
+    /// let socket = UdpSocket::new().unwrap();
+    /// let local_addr = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOOPBACK, 8000));
+    /// socket.bind(local_addr).unwrap();
+    /// assert_eq!(socket.sockname().unwrap(), local_addr);
     pub fn sockname(&self) -> Result<SocketAddr> {
         self.0.sockname()
+    }
+
+    /// Returns the socket's peer address.
+    ///
+    /// This function assumes the socket is connected,
+    /// i.e. it must be called after [`connect()`](UdpSocket::connect).
+    ///
+    /// # Examples
+    /// ```rust
+    /// use kernel::net::udp::UdpSocket;
+    /// use kernel::net::addr::*;
+    ///
+    /// let socket = UdpSocket::new().unwrap();
+    /// let peer_addr = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOOPBACK, 8000));
+    /// socket.connect(&peer_addr).unwrap();
+    /// assert_eq!(socket.peername().unwrap(), peer_addr);
+    pub fn peername(&self) -> Result<SocketAddr> {
+        self.0.peername()
     }
 
     /// Receives data from another socket.
@@ -58,7 +89,7 @@ impl UdpSocket {
     /// See [`ReceiveFlag`] for more.
     ///
     /// Returns the number of bytes received and the address of the sender.
-    pub fn receive(
+    pub fn receive_from(
         &self,
         buf: &mut [u8],
         flags: impl IntoIterator<Item = ReceiveFlag>,
@@ -69,16 +100,76 @@ impl UdpSocket {
     }
 
     /// Sends data to another socket.
+    ///
     /// The given flags are used to modify the behavior of the send operation.
     /// See [`SendFlag`] for more.
     ///
     /// Returns the number of bytes sent.
-    pub fn send(
+    pub fn send_to(
         &self,
         buf: &[u8],
         address: &SocketAddr,
         flags: impl IntoIterator<Item = SendFlag>,
     ) -> Result<usize> {
         self.0.send_to(buf, &address, flags)
+    }
+
+    /// Connects the socket to the given address.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use kernel::net::udp::UdpSocket;
+    /// use kernel::net::addr::*;
+    ///
+    /// let socket = UdpSocket::new().unwrap();
+    /// let peer_addr = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOOPBACK, 8000));
+    /// socket.connect(&peer_addr).unwrap();
+    /// ```
+    pub fn connect(&self, address: &SocketAddr) -> Result {
+        self.0.connect(address, 0)
+    }
+
+    /// Receives data from the connected socket.
+    ///
+    /// This function assumes the socket is connected,
+    /// i.e. it must be called after [`connect()`](UdpSocket::connect).
+    ///
+    /// Returns the number of bytes received.
+    pub fn receive(
+        &self,
+        buf: &mut [u8],
+        flags: impl IntoIterator<Item = ReceiveFlag>,
+    ) -> Result<usize> {
+        self.0.receive(buf, flags)
+    }
+
+    /// Sends data to the connected socket.
+    ///
+    /// This function assumes the socket is connected,
+    /// i.e. it must be called after [`connect()`](UdpSocket::connect).
+    ///
+    /// Returns the number of bytes sent.
+    pub fn send(&self, buf: &[u8], flags: impl IntoIterator<Item = SendFlag>) -> Result<usize> {
+        self.0.send(buf, flags)
+    }
+
+    /// Sets the value of the given option.
+    ///
+    /// See [`Socket::set_option()`](Socket::set_option) for more.
+    pub fn set_option<T>(&self, option: opts::Options, value: T) -> Result
+    where
+        T: Sized,
+    {
+        self.0.set_option(option, value)
+    }
+
+    /// Gets the value of the given option.
+    ///
+    /// See [`Socket::get_option()`](Socket::get_option) for more.
+    pub fn get_option<T>(&self, option: opts::Options) -> Result<T>
+    where
+        T: Sized,
+    {
+        self.0.get_option(option)
     }
 }
