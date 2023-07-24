@@ -8,37 +8,72 @@
 
 use crate::net::AddressFamily;
 use core::fmt::Display;
+use core::hash::Hash;
+use core::str::FromStr;
 
 /// An IPv4 address.
 /// Wraps a `struct in_addr`.
+#[derive(Copy, Clone)]
 #[repr(transparent)]
 pub struct Ipv4Addr(pub(crate) bindings::in_addr);
 
 impl Ipv4Addr {
-    /// Create a new IPv4 address from four octets.
-    /// The bytes do not need to be in network order.
+    /// Create a new IPv4 address from four 8-bit integers.
+    ///
+    /// The IP address will be `a.b.c.d`.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use kernel::net::addr::Ipv4Addr;
+    ///
+    /// let addr = Ipv4Addr::new(192, 168, 0, 1);
+    /// ```
     pub const fn new(a: u8, b: u8, c: u8, d: u8) -> Self {
-        Ipv4Addr(bindings::in_addr {
-            s_addr: u32::from_ne_bytes([a.to_be(), b.to_be(), c.to_be(), d.to_be()]),
-        })
-    }
-
-    /// Create a new IPv4 address from an array of octets.
-    /// The bytes do not need to be in network order.
-    pub const fn from(octets: [u8; 4]) -> Self {
-        Self::new(octets[0], octets[1], octets[2], octets[3])
+        Self::from_bits(u32::from_be_bytes([a, b, c, d]))
     }
 
     /// Get the octets of the address.
-    /// The bytes are in network order.
-    pub fn octets(&self) -> &[u8; 4] {
-        // SAFETY: `s_addr` is a 32-bit integer, which is 4 bytes.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use kernel::net::addr::Ipv4Addr;
+    ///
+    /// let addr = Ipv4Addr::new(192, 168, 0, 1);
+    /// let expected = [192, 168, 0, 1];
+    /// assert_eq!(addr.octets(), &expected);
+    /// ```
+    pub const fn octets(&self) -> &[u8; 4] {
+        // SAFETY: The s_addr field is a 32-bit integer, which is the same size as the array.
         unsafe { &*(&self.0.s_addr as *const _ as *const [u8; 4]) }
     }
 
-    /// The "any" address: 0.0.0.0
-    /// Used to accept any incoming message.
-    pub const ANY: Self = Self::new(0, 0, 0, 0);
+    /// Create a new IPv4 address from a 32-bit integer.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use kernel::net::addr::Ipv4Addr;
+    ///
+    /// let addr = Ipv4Addr::from_bits(0xc0a80001);
+    /// assert_eq!(addr, Ipv4Addr::new(192, 168, 0, 1));
+    /// ```
+    pub const fn from_bits(bits: u32) -> Self {
+        Ipv4Addr(bindings::in_addr {
+            s_addr: bits.to_be(),
+        })
+    }
+
+    /// Get the 32-bit integer representation of the address.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use kernel::net::addr::Ipv4Addr;
+    ///
+    /// let addr = Ipv4Addr::new(192, 168, 0, 1);
+    /// assert_eq!(addr.to_bits(), 0xc0a80001);
+    /// ```
+    pub const fn to_bits(&self) -> u32 {
+        u32::from_be(self.0.s_addr)
+    }
 
     /// The broadcast address: 255.255.255.255
     /// Used to send a message to all hosts on the network.
@@ -47,6 +82,10 @@ impl Ipv4Addr {
     /// "None" address; can be used as return value to indicate an error.
     pub const NONE: Self = Self::new(255, 255, 255, 255);
 
+    /// The "any" address: 0.0.0.0
+    /// Used to accept any incoming message.
+    pub const UNSPECIFIED: Self = Self::new(0, 0, 0, 0);
+
     /// A dummy address: 192.0.0.8
     /// Used as ICMP reply source if no address is set.
     pub const DUMMY: Self = Self::new(192, 0, 0, 8);
@@ -54,6 +93,114 @@ impl Ipv4Addr {
     /// The loopback address: 127.0.0.1
     /// Used to send a message to the local host.
     pub const LOOPBACK: Self = Self::new(127, 0, 0, 1);
+}
+
+impl From<[u8; 4]> for Ipv4Addr {
+    /// Create a new IPv4 address from an array of 8-bit integers.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use kernel::net::addr::Ipv4Addr;
+    ///
+    /// let addr = Ipv4Addr::from([192, 168, 0, 1]);
+    /// assert_eq!(addr, Ipv4Addr::new(192, 168, 0, 1));
+    /// ```
+    fn from(octets: [u8; 4]) -> Self {
+        Self::new(octets[0], octets[1], octets[2], octets[3])
+    }
+}
+
+impl From<Ipv4Addr> for u32 {
+    /// Get the 32-bit integer representation of the address.
+    /// This is the same as calling [`Ipv4Addr::to_bits`].
+    fn from(addr: Ipv4Addr) -> Self {
+        addr.to_bits()
+    }
+}
+
+impl From<u32> for Ipv4Addr {
+    /// Create a new IPv4 address from a 32-bit integer.
+    /// This is the same as calling [`Ipv4Addr::from_bits`].
+    fn from(bits: u32) -> Self {
+        Self::from_bits(bits)
+    }
+}
+
+impl FromStr for Ipv4Addr {
+    type Err = ();
+
+    /// Create a new IPv4 address from a string.
+    /// The string must be in the format `a.b.c.d`, where `a`, `b`, `c` and `d` are 8-bit integers.
+    ///
+    /// # Examples
+    /// Valid addresses:
+    /// ```rust
+    /// use core::str::FromStr;
+    /// use kernel::net::addr::Ipv4Addr;
+    ///
+    /// let addr = Ipv4Addr::from_str("192.168.0.1");
+    /// assert_eq!(addr, Ok(Ipv4Addr::new(192, 168, 0, 1)));
+    /// ```
+    ///
+    /// Invalid addresses:
+    /// ```rust
+    /// use core::str::FromStr;
+    /// use kernel::net::addr::Ipv4Addr;
+    ///
+    /// let mut addr = Ipv4Addr::from_str("invalid");
+    /// assert_eq!(addr, Err(()));
+    ///
+    /// addr = Ipv4Addr::from_str("280.168.0.1");
+    /// assert_eq!(addr, Err(()));
+    ///
+    /// addr = Ipv4Addr::from_str("0.0.0.0.0");
+    /// assert_eq!(addr, Err(()));
+    /// ```
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.is_empty() || s.len() > 15 {
+            return Err(());
+        }
+
+        let mut octets = [0u8; 4];
+        for (i, octet) in s.split('.').enumerate() {
+            if i >= 4 {
+                return Err(());
+            }
+            octets[i] = octet.parse().map_err(|_| ())?;
+        }
+        Ok(Self::from(octets))
+    }
+}
+
+impl PartialEq<Ipv4Addr> for Ipv4Addr {
+    /// Compare two IPv4 addresses.
+    /// Returns `true` if the addresses are made up of the same bytes.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use kernel::net::addr::Ipv4Addr;
+    ///
+    /// let addr1 = Ipv4Addr::new(192, 168, 0, 1);
+    /// let addr2 = Ipv4Addr::new(192, 168, 0, 1);
+    /// assert_eq!(addr1, addr2);
+    ///
+    /// let addr3 = Ipv4Addr::new(192, 168, 0, 2);
+    /// assert_ne!(addr1, addr3);
+    /// ```
+    fn eq(&self, other: &Ipv4Addr) -> bool {
+        self.to_bits() == other.to_bits()
+    }
+}
+
+impl Eq for Ipv4Addr {}
+
+impl Hash for Ipv4Addr {
+    /// Hash an IPv4 address.
+    ///
+    /// The trait cannot be derived because the `in_addr` struct does not implement `Hash`.
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        self.to_bits().hash(state)
+    }
 }
 
 impl Display for Ipv4Addr {
@@ -102,9 +249,56 @@ impl Ipv6Addr {
         })
     }
 
+    /// Create a new IPv6 address from an array of 8-bit integers.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use kernel::net::addr::Ipv6Addr;
+    ///
+    /// let addr = Ipv6Addr::from_bytes([0x20, 0x01, 0x0d, 0xb8, 0x85, 0xa3, 0x00, 0x00, 0x00, 0x00, 0x8a, 0x2e, 0x03, 0x70, 0x73, 0x34]);
+    /// assert_eq!(addr, Ipv6Addr::new(0x2001, 0x0db8, 0x85a3, 0x0000, 0x0000, 0x8a2e, 0x0370, 0x7334));
+    pub const fn from_bytes(bytes: [u8; 16]) -> Self {
+        Ipv6Addr(bindings::in6_addr {
+            in6_u: bindings::in6_addr__bindgen_ty_1 { u6_addr8: bytes },
+        })
+    }
+
+    /// Create a new IPv6 address from a 128-bit integer.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use kernel::net::addr::Ipv6Addr;
+    ///
+    /// let addr = Ipv6Addr::from_bits(0x20010db885a3000000008a2e03707334);
+    /// assert_eq!(addr, Ipv6Addr::new(0x2001, 0x0db8, 0x85a3, 0x0000, 0x0000, 0x8a2e, 0x0370, 0x7334));
+    /// ```
+    pub const fn from_bits(bits: u128) -> Self {
+        Self::from_bytes(bits.to_be_bytes())
+    }
+
+    /// Get the 128-bit integer representation of the address.
+    /// The bytes are in network order.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use kernel::net::addr::Ipv6Addr;
+    ///
+    /// let addr = Ipv6Addr::new(0x2001, 0x0db8, 0x85a3, 0x0000, 0x0000, 0x8a2e, 0x0370, 0x7334);
+    /// assert_eq!(addr.to_bits(), 0x20010db885a3000000008a2e03707334);
+    /// ```
+    pub fn to_bits(&self) -> u128 {
+        u128::from_be_bytes(self.octets().clone())
+    }
+
     /// Get the octets of the address.
     /// The bytes are in network order.
-    pub fn octets(&self) -> &[u16; 8] {
+    pub fn octets(&self) -> &[u8; 16] {
+        unsafe { &self.0.in6_u.u6_addr8 as _ }
+    }
+
+    /// Get the segments of the address.
+    /// The segments are the 16-bit integers that make up the address.
+    pub fn segments(&self) -> &[u16; 8] {
         unsafe { &self.0.in6_u.u6_addr16 as _ }
     }
 
