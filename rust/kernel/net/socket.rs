@@ -471,6 +471,23 @@ impl Socket {
         })?;
         Ok(unsafe { value.assume_init() })
     }
+
+    /// Consumes the socket and returns the underlying pointer.
+    ///
+    /// # Safety
+    /// The caller must ensure that the pointer is not used after the socket is dropped.
+    pub unsafe fn into_inner(self) -> *mut bindings::socket {
+        self.0
+    }
+
+    /// Returns the underlying pointer.
+    /// The pointer is valid for the lifetime of the wrapper.
+    ///
+    /// # Safety
+    /// The caller must ensure that the pointer is not used after the socket is dropped.
+    pub unsafe fn as_inner(&self) -> *mut bindings::socket {
+        self.0
+    }
 }
 
 impl Drop for Socket {
