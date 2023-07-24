@@ -227,6 +227,7 @@ impl Socket {
 
     /// Returns the address the socket is connected to.
     /// Wraps the `kernel_getpeername` function.
+    ///
     /// The socket must be connected.
     pub fn peername(&self) -> Result<SocketAddr> {
         // SAFETY: A zero-initialized address is a valid input for `kernel_getpeername`.
@@ -239,7 +240,6 @@ impl Socket {
 
     /// Connects the socket to a specific address.
     /// Wraps the `kernel_connect` function.
-    /// The socket must be a connection-oriented socket.
     ///
     /// # Arguments
     /// * `address`: The address to connect to.

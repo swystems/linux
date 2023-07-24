@@ -94,12 +94,48 @@ impl Iterator for TcpIncoming<'_> {
 }
 
 /// A TCP stream.
+///
 /// Represents an active TCP connection between two sockets.
+/// The stream can be opened by the listener, with [`TcpListener::accept()`], or by
+/// connecting to a remote address with [`TcpStream::connect()`].
+/// The stream can be used to send and receive data.
 ///
 /// See [`TcpListener`] for an example of how to create a [`TcpStream`].
 pub struct TcpStream(pub(crate) Socket);
 
 impl TcpStream {
+    /// Opens a TCP stream by connecting to the given address.
+    ///
+    /// Returns a [`TcpStream`] on success.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use kernel::net::tcp::TcpStream;
+    /// use kernel::net::addr::*;
+    ///
+    /// let peer_addr = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOOPBACK, 8000));
+    /// let stream = TcpStream::connect(&peer_addr).unwrap();
+    /// ```
+    pub fn connect(address: &SocketAddr) -> Result<Self> {
+        let socket = Socket::new(AddressFamily::Inet, SockType::Stream, IpProtocol::Tcp)?;
+        socket.connect(address, 0)?;
+        Ok(Self(socket))
+    }
+
+    /// Returns the address of the remote peer of this connection.
+    ///
+    /// See [`Socket::peername()`] for more.
+    pub fn peername(&self) -> Result<SocketAddr> {
+        self.0.peername()
+    }
+
+    /// Returns the address of the local socket of this connection.
+    ///
+    /// See [`Socket::sockname()`] for more.
+    pub fn sockname(&self) -> Result<SocketAddr> {
+        self.0.sockname()
+    }
+
     /// Receive data from the stream.
     /// The given flags are used to modify the behavior of the receive operation.
     /// See [`ReceiveFlag`] for more.
@@ -147,6 +183,28 @@ impl TcpStream {
     /// }
     pub fn send(&self, buf: &[u8], flags: impl IntoIterator<Item = SendFlag>) -> Result<usize> {
         self.0.send(buf, flags)
+    }
+
+    /// Manually shutdown some portion of the stream.
+    /// See [`ShutdownCmd`] for more.
+    ///
+    /// This method is not required to be called, as the stream will be shutdown
+    /// automatically when it is dropped.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use kernel::net::tcp::TcpListener;
+    /// use kernel::net::addr::*;
+    /// use kernel::net::socket::ShutdownCmd;
+    ///
+    /// let listener = TcpListener::new(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOOPBACK, 8000))).unwrap();
+    /// while let Ok(stream) = listener.accept() {
+    ///    // ...
+    ///    stream.shutdown(ShutdownCmd::RdWr)?;
+    /// }
+    /// ```
+    pub fn shutdown(&self, how: ShutdownCmd) -> Result {
+        self.0.shutdown(how)
     }
 }
 
