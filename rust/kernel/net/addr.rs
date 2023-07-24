@@ -137,7 +137,24 @@ impl Display for Ipv6Addr {
     }
 }
 
-/// A generic Socket Address. Acts like a `struct sockaddr`.
+/// A wrapper for a generic socket address.
+///
+/// Wraps a C `struct sockaddr_storage`.
+/// Unlike [`SocketAddr`], this struct is meant to be used internally only,
+/// as a parameter for kernel functions call.
+#[repr(transparent)]
+pub(crate) struct SocketAddrStorage(pub(crate) bindings::__kernel_sockaddr_storage);
+
+impl SocketAddrStorage {
+    pub(crate) fn family(&self) -> isize {
+        // SAFETY: The union access is safe because the `ss_family` field is always valid.
+        unsafe { self.0.__bindgen_anon_1.__bindgen_anon_1.ss_family as _ }
+    }
+}
+
+/// A generic Socket Address. Acts like a `struct sockaddr_storage`.
+/// `sockaddr_storage` is used instead of `sockaddr` because it is guaranteed to be large enough to hold any socket address.
+///
 /// The purpose of this enum is to be used as a generic parameter for functions that can take any type of address.
 pub enum SocketAddr {
     /// An IPv4 address.
@@ -207,25 +224,25 @@ impl SocketAddr {
         }
     }
 
-    /// Returns a pointer to the C `struct sockaddr` contained.
+    /// Returns a pointer to the C `struct sockaddr_storage` contained.
     /// Used in the kernel functions that take a pointer to a socket address.
-    pub(crate) fn as_ptr(&self) -> *const bindings::sockaddr {
+    pub(crate) fn as_ptr(&self) -> *const SocketAddrStorage {
         match self {
             SocketAddr::V4(addr) => addr as *const _ as _,
             SocketAddr::V6(addr) => addr as *const _ as _,
         }
     }
 
-    /// Creates a `SocketAddr` from a C `struct sockaddr`.
-    /// The function consumes the `struct sockaddr`.
+    /// Creates a `SocketAddr` from a C `struct sockaddr_storage`.
+    /// The function consumes the `struct sockaddr_storage`.
     /// Used in the kernel functions that return a socket address.
     ///
     /// # Panics
-    /// Panics if the address family of the `struct sockaddr` is invalid.
+    /// Panics if the address family of the `struct sockaddr_storage` is invalid.
     /// This should never happen.
     /// If it does, it is likely because of an invalid pointer.
-    pub(crate) fn from_raw(sockaddr: bindings::sockaddr) -> Self {
-        match sockaddr.sa_family as u32 {
+    pub(crate) fn from_raw(sockaddr: SocketAddrStorage) -> Self {
+        match sockaddr.family() as u32 {
             bindings::AF_INET => SocketAddr::V4(unsafe {
                 core::ptr::read(&sockaddr as *const _ as *const SocketAddrV4)
             }),

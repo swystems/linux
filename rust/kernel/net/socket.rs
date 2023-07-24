@@ -218,11 +218,16 @@ impl Socket {
     /// Wraps the `kernel_getsockname` function.
     pub fn sockname(&self) -> Result<SocketAddr> {
         // SAFETY: A zero-initialized address is a valid input for `kernel_getsockname`.
-        let mut addr = unsafe { core::mem::zeroed::<bindings::sockaddr>() };
+        let mut addr: SocketAddrStorage = unsafe { core::mem::zeroed() };
 
         // SAFETY: FFI call; the address is valid for the lifetime of the wrapper.
-        unsafe { to_result(bindings::kernel_getsockname(self.0, &mut addr)) }
-            .map(|_| SocketAddr::from_raw(addr))
+        unsafe {
+            to_result(bindings::kernel_getsockname(
+                self.0,
+                &mut addr as *mut _ as _,
+            ))
+        }
+        .map(|_| SocketAddr::from_raw(addr))
     }
 
     /// Returns the address the socket is connected to.
@@ -231,11 +236,16 @@ impl Socket {
     /// The socket must be connected.
     pub fn peername(&self) -> Result<SocketAddr> {
         // SAFETY: A zero-initialized address is a valid input for `kernel_getpeername`.
-        let mut addr = unsafe { core::mem::zeroed::<bindings::sockaddr>() };
+        let mut addr: SocketAddrStorage = unsafe { core::mem::zeroed() };
 
         // SAFETY: FFI call; the address is valid for the lifetime of the wrapper.
-        unsafe { to_result(bindings::kernel_getpeername(self.0, &mut addr)) }
-            .map(|_| SocketAddr::from_raw(addr))
+        unsafe {
+            to_result(bindings::kernel_getpeername(
+                self.0,
+                &mut addr as *mut _ as _,
+            ))
+        }
+        .map(|_| SocketAddr::from_raw(addr))
     }
 
     /// Connects the socket to a specific address.
@@ -282,7 +292,7 @@ impl Socket {
         flags: impl IntoIterator<Item = ReceiveFlag>,
     ) -> Result<(usize, Option<SocketAddr>)> {
         // SAFETY: An uninitialized address is a valid field value for `msghdr`.
-        let addr: bindings::sockaddr = unsafe { core::mem::zeroed() };
+        let addr: SocketAddrStorage = unsafe { core::mem::zeroed() };
 
         // SAFETY: An uninitialized msghdr is a valid input for `kernel_recvmsg`.
         let mut msg: bindings::msghdr = unsafe { core::mem::zeroed() };
