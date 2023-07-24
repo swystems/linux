@@ -40,10 +40,56 @@ impl TcpListener {
         socket.listen(128)?;
         Ok(Self(socket))
     }
+
+    /// Returns the local address that this listener is bound to.
+    ///
+    /// See [`Socket::sockname()`] for more.
+    pub fn sockname(&self) -> Result<SocketAddr> {
+        self.0.sockname()
+    }
+
+    /// Returns an iterator over incoming connections.
+    ///
+    /// Each iteration will return a [`Result`] containing a [`TcpStream`] on success.
+    /// See [`TcpIncoming`] for more.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use kernel::net::tcp::TcpListener;
+    /// use kernel::net::addr::*;
+    ///
+    /// let listener = TcpListener::new(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOOPBACK, 8000))).unwrap();
+    /// for stream in listener.incoming() {
+    ///    // ...
+    /// }
+    pub fn incoming(&self) -> TcpIncoming<'_> {
+        TcpIncoming { listener: self }
+    }
+
     /// Accepts an incoming connection.
     /// Returns a [`TcpStream`] on success.
     pub fn accept(&self) -> Result<TcpStream> {
         Ok(TcpStream(self.0.accept(true)?))
+    }
+}
+
+/// An iterator over incoming connections from a [`TcpListener`].
+///
+/// Each iteration will return a [`Result`] containing a [`TcpStream`] on success.
+/// The iterator will never return [`None`].
+///
+/// This struct is created by the [`TcpListener::incoming()`] method.
+pub struct TcpIncoming<'a> {
+    listener: &'a TcpListener,
+}
+
+impl Iterator for TcpIncoming<'_> {
+    /// The item type of the iterator.
+    type Item = Result<TcpStream>;
+
+    /// Get the next connection from the listener.
+    fn next(&mut self) -> Option<Self::Item> {
+        Some(self.listener.accept())
     }
 }
 
