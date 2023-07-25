@@ -222,45 +222,82 @@ impl Display for Ipv4Addr {
 
 /// An IPv6 address.
 /// Wraps a `struct in6_addr`.
+#[derive(Copy, Clone)]
 #[repr(transparent)]
 pub struct Ipv6Addr(pub(crate) bindings::in6_addr);
 
 impl Ipv6Addr {
     /// Create a new IPv6 address from eight 16-bit integers.
-    /// The integers do not need to be in network order.
-    pub const fn new(a: u16, b: u16, c: u16, d: u16, e: u16, f: u16, g: u16, h: u16) -> Self {
-        Self::from([
-            a.to_be(),
-            b.to_be(),
-            c.to_be(),
-            d.to_be(),
-            e.to_be(),
-            f.to_be(),
-            g.to_be(),
-            h.to_be(),
-        ])
-    }
-
-    /// Create a new IPv6 address from an array of 16-bit integers.
-    /// The integers do not need to be in network order.
-    pub const fn from(octets: [u16; 8]) -> Self {
-        Ipv6Addr(bindings::in6_addr {
-            in6_u: bindings::in6_addr__bindgen_ty_1 { u6_addr16: octets },
-        })
-    }
-
-    /// Create a new IPv6 address from an array of 8-bit integers.
+    /// The 16-bit integers are transformed in network order.
+    ///
+    /// The IP address will be `a:b:c:d:e:f:g:h`.
     ///
     /// # Examples
     /// ```rust
     /// use kernel::net::addr::Ipv6Addr;
     ///
-    /// let addr = Ipv6Addr::from_bytes([0x20, 0x01, 0x0d, 0xb8, 0x85, 0xa3, 0x00, 0x00, 0x00, 0x00, 0x8a, 0x2e, 0x03, 0x70, 0x73, 0x34]);
-    /// assert_eq!(addr, Ipv6Addr::new(0x2001, 0x0db8, 0x85a3, 0x0000, 0x0000, 0x8a2e, 0x0370, 0x7334));
-    pub const fn from_bytes(bytes: [u8; 16]) -> Self {
-        Ipv6Addr(bindings::in6_addr {
-            in6_u: bindings::in6_addr__bindgen_ty_1 { u6_addr8: bytes },
+    /// let addr = Ipv6Addr::new(0x2001, 0x0db8, 0x85a3, 0x0000, 0x0000, 0x8a2e, 0x0370, 0x7334);
+    /// ```
+    pub const fn new(a: u16, b: u16, c: u16, d: u16, e: u16, f: u16, g: u16, h: u16) -> Self {
+        Self(bindings::in6_addr {
+            in6_u: bindings::in6_addr__bindgen_ty_1 {
+                u6_addr16: [
+                    a.to_be(),
+                    b.to_be(),
+                    c.to_be(),
+                    d.to_be(),
+                    e.to_be(),
+                    f.to_be(),
+                    g.to_be(),
+                    h.to_be(),
+                ],
+            },
         })
+    }
+
+    /// Get the octets of the address.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use kernel::net::addr::Ipv6Addr;
+    ///
+    /// let addr = Ipv6Addr::new(0x2001, 0x0db8, 0x85a3, 0x0000, 0x0000, 0x8a2e, 0x0370, 0x7334);
+    /// let expected = [0x20, 0x01, 0x0d, 0xb8, 0x85, 0xa3, 0x00, 0x00, 0x00, 0x00, 0x8a, 0x2e, 0x03, 0x70, 0x73, 0x34];
+    /// assert_eq!(addr.octets(), &expected);
+    /// ```
+    pub const fn octets(&self) -> &[u8; 16] {
+        // SAFETY: The u6_addr8 field is a [u8; 16] array.
+        unsafe { &*(&self.0.in6_u.u6_addr8) }
+    }
+
+    /// Get the segments of the address.
+    ///
+    /// A segment is a 16-bit integer.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use kernel::net::addr::Ipv6Addr;
+    ///
+    /// let addr = Ipv6Addr::new(0x2001, 0x0db8, 0x85a3, 0x0000, 0x0000, 0x8a2e, 0x0370, 0x7334);
+    /// let expected = [0x2001, 0x0db8, 0x85a3, 0x0000, 0x0000, 0x8a2e, 0x0370, 0x7334];
+    /// assert_eq!(addr.segments(), &expected);
+    /// ```
+    pub const fn segments(&self) -> &[u16; 8] {
+        // SAFETY: The u6_addr16 field is a [u16; 8] array.
+        unsafe { &*(&self.0.in6_u.u6_addr16) }
+    }
+
+    /// Create a 128-bit integer representation of the address.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use kernel::net::addr::Ipv6Addr;
+    ///
+    /// let addr = Ipv6Addr::new(0x2001, 0x0db8, 0x85a3, 0x0000, 0x0000, 0x8a2e, 0x0370, 0x7334);
+    /// assert_eq!(addr.to_bits(), 0x20010db885a3000000008a2e03707334);
+    /// ```
+    pub fn to_bits(&self) -> u128 {
+        u128::from_be_bytes(self.octets().clone() as _)
     }
 
     /// Create a new IPv6 address from a 128-bit integer.
@@ -273,33 +310,11 @@ impl Ipv6Addr {
     /// assert_eq!(addr, Ipv6Addr::new(0x2001, 0x0db8, 0x85a3, 0x0000, 0x0000, 0x8a2e, 0x0370, 0x7334));
     /// ```
     pub const fn from_bits(bits: u128) -> Self {
-        Self::from_bytes(bits.to_be_bytes())
-    }
-
-    /// Get the 128-bit integer representation of the address.
-    /// The bytes are in network order.
-    ///
-    /// # Examples
-    /// ```rust
-    /// use kernel::net::addr::Ipv6Addr;
-    ///
-    /// let addr = Ipv6Addr::new(0x2001, 0x0db8, 0x85a3, 0x0000, 0x0000, 0x8a2e, 0x0370, 0x7334);
-    /// assert_eq!(addr.to_bits(), 0x20010db885a3000000008a2e03707334);
-    /// ```
-    pub fn to_bits(&self) -> u128 {
-        u128::from_be_bytes(self.octets().clone())
-    }
-
-    /// Get the octets of the address.
-    /// The bytes are in network order.
-    pub fn octets(&self) -> &[u8; 16] {
-        unsafe { &self.0.in6_u.u6_addr8 as _ }
-    }
-
-    /// Get the segments of the address.
-    /// The segments are the 16-bit integers that make up the address.
-    pub fn segments(&self) -> &[u16; 8] {
-        unsafe { &self.0.in6_u.u6_addr16 as _ }
+        Ipv6Addr(bindings::in6_addr {
+            in6_u: bindings::in6_addr__bindgen_ty_1 {
+                u6_addr8: bits.to_be_bytes() as _,
+            },
+        })
     }
 
     /// The "any" address: ::
@@ -309,6 +324,48 @@ impl Ipv6Addr {
     /// The loopback address: ::1
     /// Used to send a message to the local host.
     pub const LOOPBACK: Self = Self::new(0, 0, 0, 0, 0, 0, 0, 1);
+}
+
+impl From<[u16; 8]> for Ipv6Addr {
+    fn from(value: [u16; 8]) -> Self {
+        Self(bindings::in6_addr {
+            in6_u: bindings::in6_addr__bindgen_ty_1 { u6_addr16: value },
+        })
+    }
+}
+
+impl From<[u8; 16]> for Ipv6Addr {
+    fn from(value: [u8; 16]) -> Self {
+        Self(bindings::in6_addr {
+            in6_u: bindings::in6_addr__bindgen_ty_1 { u6_addr8: value },
+        })
+    }
+}
+
+impl From<Ipv6Addr> for u128 {
+    fn from(addr: Ipv6Addr) -> Self {
+        addr.to_bits()
+    }
+}
+
+impl From<u128> for Ipv6Addr {
+    fn from(bits: u128) -> Self {
+        Self::from_bits(bits)
+    }
+}
+
+impl PartialEq for Ipv6Addr {
+    fn eq(&self, other: &Self) -> bool {
+        self.to_bits() == other.to_bits()
+    }
+}
+
+impl Eq for Ipv6Addr {}
+
+impl Hash for Ipv6Addr {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        self.to_bits().hash(state)
+    }
 }
 
 impl Display for Ipv6Addr {
