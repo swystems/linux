@@ -538,39 +538,13 @@ pub trait GenericSocketAddr: Copy {
     fn family() -> AddressFamily;
 }
 
-/// Trait for socket addresses that contain an IP address and a port.
-///
-/// This trait is implemented by [SocketAddrV4] and [SocketAddrV6].
-pub trait SocketAddressInfo<T: Display>: Display + GenericSocketAddr {
-    /// Returns a reference to the IP address contained.
-    /// The type of the IP address is the type parameter of the trait.
-    ///
-    /// # Examples
-    /// ```rust
-    /// use kernel::net::addr::{Ipv4Addr, SocketAddr, SocketAddressInfo, SocketAddrV4};
-    /// let addr = SocketAddrV4::new(Ipv4Addr::new(192, 168, 0, 1), 80);
-    /// assert_eq!(addr.address(), &Ipv4Addr::new(192, 168, 0, 1));
-    /// ```
-    fn address(&self) -> &T;
-
-    /// Returns the port contained. The port is in network byte order.
-    ///
-    /// # Examples
-    /// ```rust
-    /// use kernel::net::addr::{Ipv4Addr, SocketAddr, SocketAddressInfo, SocketAddrV4};
-    /// let addr = SocketAddrV4::new(Ipv4Addr::new(192, 168, 0, 1), 80);
-    /// assert_eq!(addr.port(), 80);
-    /// ```
-    fn port(&self) -> u16;
-}
-
 /// IPv4 socket address.
 /// Wraps a C `struct sockaddr_in`.
 ///
 /// # Examples
 /// ```rust
 /// use kernel::bindings;
-/// use kernel::net::addr::{GenericSocketAddr, Ipv4Addr, SocketAddr, SocketAddressInfo, SocketAddrV4};
+/// use kernel::net::addr::{GenericSocketAddr, Ipv4Addr, SocketAddr, SocketAddrV4};
 /// let addr = SocketAddrV4::new(Ipv4Addr::new(192, 168, 0, 1), 80);
 /// assert_eq!(addr.address(), &Ipv4Addr::new(192, 168, 0, 1));
 /// assert_eq!(SocketAddrV4::size(), core::mem::size_of::<bindings::sockaddr_in>());
@@ -590,6 +564,35 @@ impl SocketAddrV4 {
             __pad: [0; 8],
         })
     }
+
+    /// Returns a reference to the IP address contained.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use kernel::net::addr::{Ipv4Addr, SocketAddrV4};
+    ///
+    /// let ip = Ipv4Addr::new(192, 168, 0, 1);
+    /// let addr = SocketAddrV4::new(ip, 80);
+    /// assert_eq!(addr.address(), &ip);
+    /// ```
+    pub fn address(&self) -> &Ipv4Addr {
+        // SAFETY: The [Ipv4Addr] is a transparent representation of the C `struct in_addr`,
+        // which is the type of `sin_addr`. Therefore, the conversion is safe.
+        unsafe { &*(&self.0.sin_addr as *const _ as *const Ipv4Addr) }
+    }
+
+    /// Returns the port contained.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use kernel::net::addr::{Ipv4Addr, SocketAddrV4};
+    ///
+    /// let addr = SocketAddrV4::new(Ipv4Addr::new(192, 168, 0, 1), 80);
+    /// assert_eq!(addr.port(), 81);
+    /// ```
+    pub fn port(&self) -> u16 {
+        self.0.sin_port.to_be()
+    }
 }
 
 impl GenericSocketAddr for SocketAddrV4 {
@@ -605,21 +608,6 @@ impl GenericSocketAddr for SocketAddrV4 {
 impl Display for SocketAddrV4 {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         write!(f, "{}:{}", self.address(), self.port())
-    }
-}
-
-impl SocketAddressInfo<Ipv4Addr> for SocketAddrV4 {
-    /// Returns a reference to the IP address contained.
-    /// The type of the IP address is [Ipv4Addr].
-    fn address(&self) -> &Ipv4Addr {
-        // SAFETY: The [Ipv4Addr] is a transparent representation of the C `struct in_addr`,
-        // which is the type of `sin_addr`. Therefore, the conversion is safe.
-        unsafe { &*(&self.0.sin_addr as *const _ as *const Ipv4Addr) }
-    }
-
-    /// Returns the port contained. The port is in network byte order.
-    fn port(&self) -> u16 {
-        self.0.sin_port.to_be()
     }
 }
 
@@ -654,7 +642,7 @@ impl Hash for SocketAddrV4 {
 /// # Examples
 /// ```rust
 /// use kernel::bindings;
-/// use kernel::net::addr::{GenericSocketAddr, Ipv6Addr, SocketAddr, SocketAddressInfo, SocketAddrV6};
+/// use kernel::net::addr::{GenericSocketAddr, Ipv6Addr, SocketAddr, SocketAddrV6};
 ///
 /// let addr = SocketAddrV6::new(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1), 80, 0, 0);
 /// assert_eq!(addr.address(), &Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1));
@@ -674,6 +662,35 @@ impl SocketAddrV6 {
             sin6_addr: addr.0,
             sin6_scope_id: scope_id,
         })
+    }
+
+    /// Returns a reference to the IP address contained.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use kernel::net::addr::{Ipv6Addr, SocketAddrV6};
+    ///
+    /// let ip = Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1);
+    /// let addr = SocketAddrV6::new(ip, 80, 0, 0);
+    /// assert_eq!(addr.address(), &ip);
+    /// ```
+    pub fn address(&self) -> &Ipv6Addr {
+        // SAFETY: The [Ipv6Addr] is a transparent representation of the C `struct in6_addr`,
+        // which is the type of `sin6_addr`. Therefore, the conversion is safe.
+        unsafe { &*(&self.0.sin6_addr as *const _ as *const Ipv6Addr) }
+    }
+
+    /// Returns the port contained.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use kernel::net::addr::{Ipv6Addr, SocketAddrV6};
+    ///
+    /// let addr = SocketAddrV6::new(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1), 80, 0, 0);
+    /// assert_eq!(addr.port(), 80);
+    /// ```
+    pub fn port(&self) -> u16 {
+        self.0.sin6_port.to_be()
     }
 
     /// Returns the flowinfo contained.
@@ -697,6 +714,7 @@ impl SocketAddrV6 {
     ///
     /// let addr = SocketAddrV6::new(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1), 80, 0, 1);
     /// assert_eq!(addr.scope_id(), 1);
+    /// ```
     pub fn scope_id(&self) -> u32 {
         self.0.sin6_scope_id as _
     }
@@ -725,21 +743,6 @@ impl Display for SocketAddrV6 {
                 self.port()
             )
         }
-    }
-}
-
-impl SocketAddressInfo<Ipv6Addr> for SocketAddrV6 {
-    /// Returns a reference to the IP address contained.
-    /// The type of the IP address is [Ipv6Addr].
-    fn address(&self) -> &Ipv6Addr {
-        // SAFETY: The [Ipv6Addr] is a transparent representation of the C `struct in6_addr`,
-        // which is the type of `sin6_addr`. Therefore, the conversion is safe.
-        unsafe { &*(&self.0.sin6_addr as *const _ as *const Ipv6Addr) }
-    }
-
-    /// Returns the port contained. The port is in network byte order.
-    fn port(&self) -> u16 {
-        self.0.sin6_port.to_be()
     }
 }
 
