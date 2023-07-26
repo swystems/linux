@@ -7,8 +7,8 @@
 //! but have been ported to use the kernel's C APIs.
 
 use crate::net::AddressFamily;
-use core::fmt::Display;
-use core::hash::Hash;
+use core::fmt::{Display, Formatter};
+use core::hash::{Hash, Hasher};
 use core::str::FromStr;
 
 /// An IPv4 address.
@@ -198,7 +198,7 @@ impl Hash for Ipv4Addr {
     /// Hash an IPv4 address.
     ///
     /// The trait cannot be derived because the `in_addr` struct does not implement `Hash`.
-    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+    fn hash<H: Hasher>(&self, state: &mut H) {
         self.to_bits().hash(state)
     }
 }
@@ -214,7 +214,7 @@ impl Display for Ipv4Addr {
     /// let addr = Ipv4Addr::new(192, 168, 0, 1);
     /// assert_eq!(format!("{}", addr), "192.168.0.1");
     /// ```
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         let octets = self.octets();
         write!(f, "{}.{}.{}.{}", octets[0], octets[1], octets[2], octets[3])
     }
@@ -363,7 +363,7 @@ impl PartialEq for Ipv6Addr {
 impl Eq for Ipv6Addr {}
 
 impl Hash for Ipv6Addr {
-    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+    fn hash<H: Hasher>(&self, state: &mut H) {
         self.to_bits().hash(state)
     }
 }
@@ -378,7 +378,7 @@ impl Display for Ipv6Addr {
     ///
     /// let addr = Ipv6Addr::new(0x2001, 0x0db8, 0x85a3, 0x0000, 0x0000, 0x8a2e, 0x0370, 0x7334);
     /// assert_eq!(format!("{}", addr), "2001:db8:85a3:0:0:8a2e:370:7334");
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         let octets = self.octets();
         write!(
             f,
@@ -541,7 +541,7 @@ pub trait GenericSocketAddr: Copy {
 /// Trait for socket addresses that contain an IP address and a port.
 ///
 /// This trait is implemented by [SocketAddrV4] and [SocketAddrV6].
-pub trait SocketAddressInfo<T> {
+pub trait SocketAddressInfo<T: Display>: Display + GenericSocketAddr {
     /// Returns a reference to the IP address contained.
     /// The type of the IP address is the type parameter of the trait.
     ///
@@ -602,6 +602,12 @@ impl GenericSocketAddr for SocketAddrV4 {
     }
 }
 
+impl Display for SocketAddrV4 {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{}:{}", self.address(), self.port())
+    }
+}
+
 impl SocketAddressInfo<Ipv4Addr> for SocketAddrV4 {
     /// Returns a reference to the IP address contained.
     /// The type of the IP address is [Ipv4Addr].
@@ -614,6 +620,31 @@ impl SocketAddressInfo<Ipv4Addr> for SocketAddrV4 {
     /// Returns the port contained. The port is in network byte order.
     fn port(&self) -> u16 {
         self.0.sin_port.to_be()
+    }
+}
+
+impl FromStr for SocketAddrV4 {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut split = s.split(':');
+        let addr: Ipv4Addr = split.next().ok_or(())?.parse().map_err(|_| ())?;
+        let port: u16 = split.next().ok_or(())?.parse().map_err(|_| ())?;
+        Ok(Self::new(addr, port))
+    }
+}
+
+impl PartialEq<SocketAddrV4> for SocketAddrV4 {
+    fn eq(&self, other: &SocketAddrV4) -> bool {
+        self.address() == other.address() && self.port() == other.port()
+    }
+}
+
+impl Eq for SocketAddrV4 {}
+
+impl Hash for SocketAddrV4 {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        (self.address(), self.port()).hash(state)
     }
 }
 
@@ -644,6 +675,31 @@ impl SocketAddrV6 {
             sin6_scope_id: scope_id,
         })
     }
+
+    /// Returns the flowinfo contained.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use kernel::net::addr::{Ipv6Addr, SocketAddrV6};
+    ///
+    /// let addr = SocketAddrV6::new(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1), 80, 0, 0);
+    /// assert_eq!(addr.flowinfo(), 0);
+    /// ```
+    pub fn flowinfo(&self) -> u32 {
+        self.0.sin6_flowinfo as _
+    }
+
+    /// Returns the scope_id contained.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use kernel::net::addr::{Ipv6Addr, SocketAddrV6};
+    ///
+    /// let addr = SocketAddrV6::new(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1), 80, 0, 1);
+    /// assert_eq!(addr.scope_id(), 1);
+    pub fn scope_id(&self) -> u32 {
+        self.0.sin6_scope_id as _
+    }
 }
 
 impl GenericSocketAddr for SocketAddrV6 {
@@ -653,6 +709,22 @@ impl GenericSocketAddr for SocketAddrV6 {
     /// The family is always [AddressFamily::Inet6].
     fn family() -> AddressFamily {
         AddressFamily::Inet6
+    }
+}
+
+impl Display for SocketAddrV6 {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        if self.scope_id() == 0 {
+            write!(f, "[{}]:{}", self.address(), self.port())
+        } else {
+            write!(
+                f,
+                "[{}%{}]:{}",
+                self.address(),
+                self.scope_id(),
+                self.port()
+            )
+        }
     }
 }
 
@@ -668,5 +740,28 @@ impl SocketAddressInfo<Ipv6Addr> for SocketAddrV6 {
     /// Returns the port contained. The port is in network byte order.
     fn port(&self) -> u16 {
         self.0.sin6_port.to_be()
+    }
+}
+
+impl PartialEq<SocketAddrV6> for SocketAddrV6 {
+    fn eq(&self, other: &SocketAddrV6) -> bool {
+        self.address() == other.address()
+            && self.port() == other.port()
+            && self.flowinfo() == other.flowinfo()
+            && self.scope_id() == other.scope_id()
+    }
+}
+
+impl Eq for SocketAddrV6 {}
+
+impl Hash for SocketAddrV6 {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        (
+            self.address(),
+            self.port(),
+            self.flowinfo(),
+            self.scope_id(),
+        )
+            .hash(state)
     }
 }
