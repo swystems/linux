@@ -7,6 +7,7 @@
 //! but have been ported to use the kernel's C APIs.
 
 use crate::net::AddressFamily;
+use core::cmp::Ordering;
 use core::fmt::{Display, Formatter};
 use core::hash::{Hash, Hasher};
 use core::str::FromStr;
@@ -204,6 +205,18 @@ impl Hash for Ipv4Addr {
     }
 }
 
+impl PartialOrd for Ipv4Addr {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.to_bits().partial_cmp(&other.to_bits())
+    }
+}
+
+impl Ord for Ipv4Addr {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.to_bits().cmp(&other.to_bits())
+    }
+}
+
 impl Display for Ipv4Addr {
     /// Display the address as a string.
     /// The bytes are in network order.
@@ -367,6 +380,18 @@ impl Eq for Ipv6Addr {}
 impl Hash for Ipv6Addr {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.to_bits().hash(state)
+    }
+}
+
+impl PartialOrd for Ipv6Addr {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.to_bits().partial_cmp(&other.to_bits())
+    }
+}
+
+impl Ord for Ipv6Addr {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.to_bits().cmp(&other.to_bits())
     }
 }
 
@@ -639,6 +664,18 @@ impl Hash for SocketAddrV4 {
     }
 }
 
+impl PartialOrd for SocketAddrV4 {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for SocketAddrV4 {
+    fn cmp(&self, other: &Self) -> Ordering {
+        (self.address(), self.port()).cmp(&(other.address(), other.port()))
+    }
+}
+
 /// IPv6 socket address.
 ///
 /// Wraps a C `struct sockaddr_in6`.
@@ -770,5 +807,28 @@ impl Hash for SocketAddrV6 {
             self.scope_id(),
         )
             .hash(state)
+    }
+}
+
+impl PartialOrd for SocketAddrV6 {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(&other))
+    }
+}
+
+impl Ord for SocketAddrV6 {
+    fn cmp(&self, other: &Self) -> Ordering {
+        (
+            self.address(),
+            self.port(),
+            self.flowinfo(),
+            self.scope_id(),
+        )
+            .cmp(&(
+                other.address(),
+                other.port(),
+                other.flowinfo(),
+                other.scope_id(),
+            ))
     }
 }
