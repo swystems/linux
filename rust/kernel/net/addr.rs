@@ -434,6 +434,7 @@ impl SocketAddrStorage {
 /// `sockaddr_storage` is used instead of `sockaddr` because it is guaranteed to be large enough to hold any socket address.
 ///
 /// The purpose of this enum is to be used as a generic parameter for functions that can take any type of address.
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum SocketAddr {
     /// An IPv4 address.
     V4(SocketAddrV4),
@@ -528,6 +529,27 @@ impl SocketAddr {
                 core::ptr::read(&sockaddr as *const _ as *const SocketAddrV6)
             }),
             _ => panic!("Invalid address family"),
+        }
+    }
+}
+
+impl From<SocketAddrV4> for SocketAddr {
+    fn from(value: SocketAddrV4) -> Self {
+        SocketAddr::V4(value)
+    }
+}
+
+impl From<SocketAddrV6> for SocketAddr {
+    fn from(value: SocketAddrV6) -> Self {
+        SocketAddr::V6(value)
+    }
+}
+
+impl Display for SocketAddr {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        match self {
+            SocketAddr::V4(addr) => addr.fmt(f),
+            SocketAddr::V6(addr) => addr.fmt(f),
         }
     }
 }
