@@ -530,7 +530,7 @@ pub enum SocketOptions {
     ///
     /// C value type: `int`
     ///
-    /// Rust value type: [SocketType](kernel::net::socket::SocketType)
+    /// Rust value type: [SockType](kernel::net::socket::SockType)
     Type = bindings::SO_TYPE as isize,
 
     /// Set or get time in microseconds to busy poll on a blocking receive.

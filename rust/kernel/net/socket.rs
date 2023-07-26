@@ -5,7 +5,7 @@
 //! This module contains the Socket layer kernel APIs that have been wrapped for usage by Rust code
 //! in the kernel.
 //!
-//! C library: [`include/linux/socket.h`](../../include/linux/socket.h)
+//! C header: [`include/linux/socket.h`](../../../../include/linux/socket.h)
 //!
 //! This API is inspired by the Rust std::net Socket API, but is not a direct port.
 //! The main difference is that the Rust std::net API is designed for user-space, while this API

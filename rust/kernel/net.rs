@@ -5,7 +5,7 @@
 //! This module contains the kernel APIs related to networking that have been ported or wrapped for
 //! usage by Rust code in the kernel.
 //!
-//! C library: [`include/linux/net.h`](../../include/linux/net.h)
+//! C header: [`include/linux/net.h`](../../../../include/linux/net.h)
 
 use core::cell::UnsafeCell;
 
