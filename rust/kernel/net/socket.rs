@@ -52,6 +52,7 @@ pub enum ShutdownCmd {
 }
 
 /// A generic socket.
+///
 /// Wraps a `struct socket` from the kernel.
 /// See `include/linux/socket.h`.
 ///
@@ -117,6 +118,7 @@ impl Socket {
     }
 
     /// Create a new socket.
+    ///
     /// Wraps the `sock_create` function.
     ///
     /// # Arguments
@@ -131,6 +133,7 @@ impl Socket {
     }
 
     /// Create a new socket in a specific namespace.
+    ///
     /// Wraps the `sock_create_kern` function.
     ///
     /// # Arguments
@@ -151,7 +154,9 @@ impl Socket {
     }
 
     /// Creates a new "lite" socket.
+    ///
     /// Wraps the `sock_create_lite` function.
+    ///
     /// This is a lighter version of `sock_create` that does not perform any sanity check.
     ///
     /// # Arguments
@@ -166,6 +171,7 @@ impl Socket {
     }
 
     /// Binds the socket to a specific address.
+    ///
     /// Wraps the `kernel_bind` function.
     ///
     /// # Arguments
@@ -178,7 +184,9 @@ impl Socket {
     }
 
     /// Connects the socket to a specific address.
+    ///
     /// Wraps the `kernel_connect` function.
+    ///
     /// The socket must be a connection-oriented socket.
     /// If the socket is not bound, it will be bound to a random local address.
     ///
@@ -200,6 +208,7 @@ impl Socket {
     }
 
     /// Accepts a connection on a socket.
+    ///
     /// Wraps the `kernel_accept` function.
     ///
     /// # Arguments
@@ -215,6 +224,7 @@ impl Socket {
     }
 
     /// Returns the address the socket is bound to.
+    ///
     /// Wraps the `kernel_getsockname` function.
     pub fn sockname(&self) -> Result<SocketAddr> {
         // SAFETY: A zero-initialized address is a valid input for `kernel_getsockname`.
@@ -231,6 +241,7 @@ impl Socket {
     }
 
     /// Returns the address the socket is connected to.
+    ///
     /// Wraps the `kernel_getpeername` function.
     ///
     /// The socket must be connected.
@@ -249,6 +260,7 @@ impl Socket {
     }
 
     /// Connects the socket to a specific address.
+    ///
     /// Wraps the `kernel_connect` function.
     ///
     /// # Arguments
@@ -267,6 +279,7 @@ impl Socket {
     }
 
     /// Shuts down the socket.
+    ///
     /// Wraps the `kernel_sock_shutdown` function.
     ///
     /// # Arguments
@@ -277,9 +290,12 @@ impl Socket {
     }
 
     /// Receives data from a remote socket and returns the bytes read and the sender address.
+    ///
     /// Wraps the `kernel_recvmsg` function.
+    ///
     /// Used by connectionless sockets to retrieve the sender of the message.
     /// If the socket is connection-oriented, the sender address will be `None`.
+    ///
     /// The function abstracts the usage of the `struct msghdr` type.
     ///
     /// # Arguments
@@ -328,7 +344,9 @@ impl Socket {
     }
 
     /// Receives data from a remote socket and returns only the bytes read.
+    ///
     /// Wraps the `kernel_recvmsg` function.
+    ///
     /// Used by connection-oriented sockets, where the sender address is the connected peer.
     pub fn receive(
         &self,
@@ -340,7 +358,9 @@ impl Socket {
     }
 
     /// Sends a message to a remote socket.
+    ///
     /// Wraps the `kernel_sendmsg` function.
+    ///
     /// Crate-public to allow its usage only in the kernel crate, as modules are not supposed
     /// to use bindings.
     ///
@@ -376,7 +396,9 @@ impl Socket {
     }
 
     /// Sends a message to a remote socket and returns the bytes sent.
+    ///
     /// Wraps the `kernel_sendmsg` function.
+    ///
     /// Used by connection-oriented sockets, as they don't need to specify the destination address.
     pub fn send(&self, bytes: &[u8], flags: impl IntoIterator<Item = SendFlag>) -> Result<usize> {
         // SAFETY: An uninitialized msghdr is a valid input for `kernel_sendmsg`.
@@ -384,7 +406,9 @@ impl Socket {
     }
 
     /// Sends a message to a specific remote socket address and returns the bytes sent.
+    ///
     /// Wraps the `kernel_sendmsg` function.
+    ///
     /// Used by connectionless sockets, as they need to specify the destination address.
     ///
     /// # Arguments
@@ -406,7 +430,9 @@ impl Socket {
     }
 
     /// Sets an option on the socket.
+    ///
     /// Wraps the `sock_setsockopt` function.
+    ///
     /// The generic type `T` is used as the type of the value to set.
     ///
     /// # Arguments
@@ -441,7 +467,9 @@ impl Socket {
     }
 
     /// Gets an option from the socket.
+    ///
     /// Wraps the `sock_getsockopt` function.
+    ///
     /// The generic type `T` is used as the type of the value to get.
     ///
     /// # Arguments
@@ -502,6 +530,7 @@ impl Socket {
 
 impl Drop for Socket {
     /// Closes and releases the socket.
+    ///
     /// Wraps the `sock_release` function.
     fn drop(&mut self) {
         // SAFETY: FFI call; the address is valid for the lifetime of the wrapper.

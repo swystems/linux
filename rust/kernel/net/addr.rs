@@ -12,6 +12,7 @@ use core::hash::{Hash, Hasher};
 use core::str::FromStr;
 
 /// An IPv4 address.
+///
 /// Wraps a `struct in_addr`.
 #[derive(Copy, Clone)]
 #[repr(transparent)]
@@ -221,6 +222,7 @@ impl Display for Ipv4Addr {
 }
 
 /// An IPv6 address.
+///
 /// Wraps a `struct in6_addr`.
 #[derive(Copy, Clone)]
 #[repr(transparent)]
@@ -539,6 +541,7 @@ pub trait GenericSocketAddr: Copy {
 }
 
 /// IPv4 socket address.
+///
 /// Wraps a C `struct sockaddr_in`.
 ///
 /// # Examples
@@ -637,6 +640,7 @@ impl Hash for SocketAddrV4 {
 }
 
 /// IPv6 socket address.
+///
 /// Wraps a C `struct sockaddr_in6`.
 ///
 /// # Examples

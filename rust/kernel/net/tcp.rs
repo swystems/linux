@@ -15,6 +15,7 @@ use crate::net::socket::{ShutdownCmd, SockType, Socket};
 use crate::net::{AddressFamily, IpProtocol};
 
 /// A TCP listener.
+///
 /// Wraps the [`Socket`] type to create a TCP-specific interface.
 ///
 /// The wrapper abstracts away the generic Socket methods that a connection-oriented

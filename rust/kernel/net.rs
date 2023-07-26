@@ -124,6 +124,7 @@ pub enum IpProtocol {
 }
 
 /// Network namespace.
+///
 /// Wraps `struct net` from `include/net/net_namespace.h`.
 #[repr(transparent)]
 pub struct Namespace(UnsafeCell<bindings::net>);
