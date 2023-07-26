@@ -559,7 +559,10 @@ impl Display for SocketAddr {
 /// The purpose of this trait is:
 /// - To force all socket addresses to have a size and an address family.
 /// - To allow the conversion of a `SocketAddr` into a concrete address.
-pub trait GenericSocketAddr: Copy {
+/// - Force all socket addresses to implement specific built-in traits.
+pub trait GenericSocketAddr:
+    Copy + Clone + PartialEq + Eq + PartialOrd + Ord + Hash + Display
+{
     /// Returns the size in bytes of the concrete address.
     ///
     /// # Examples
