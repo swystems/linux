@@ -10,9 +10,10 @@
 
 use crate::error::Result;
 use crate::net::addr::SocketAddr;
+use crate::net::ip::IpProtocol;
 use crate::net::socket::flags::{ReceiveFlag, SendFlag};
 use crate::net::socket::{ShutdownCmd, SockType, Socket};
-use crate::net::{AddressFamily, IpProtocol};
+use crate::net::AddressFamily;
 
 /// A TCP listener.
 ///

@@ -15,6 +15,7 @@
 use super::*;
 use crate::error::{to_result, Result};
 use crate::net::addr::*;
+use crate::net::ip::IpProtocol;
 use core::cmp::max;
 use core::marker::PhantomData;
 use core::mem::MaybeUninit;
@@ -63,7 +64,7 @@ pub enum ShutdownCmd {
 /// A simple TCP echo server:
 /// ```rust
 /// use kernel::net::addr::{Ipv4Addr, SocketAddr, SocketAddrV4};
-/// use kernel::net::{AddressFamily, init_ns, IpProtocol};
+/// use kernel::net::{AddressFamily, init_ns };
 /// use kernel::net::socket::{Socket, SockType};
 ///
 /// let socket = Socket::new_kern(

@@ -417,7 +417,7 @@ pub enum SocketOptions {
     ///
     /// C value type: `int`
     ///
-    /// Rust value type: [IpProtocol](kernel::net::IpProtocol)
+    /// Rust value type: [IpProtocol](kernel::net::ip::IpProtocol)
     Protocol = bindings::SO_PROTOCOL as isize,
 
     /// Set or get maximum socket receive buffer.

@@ -13,6 +13,7 @@ pub mod addr;
 pub mod socket;
 pub mod tcp;
 pub mod udp;
+pub mod ip;
 
 /// The address family.
 ///
@@ -102,25 +103,6 @@ pub enum AddressFamily {
     Smc = bindings::AF_SMC as isize,
     /// Express Data Path sockets.
     Xdp = bindings::AF_XDP as isize,
-}
-
-/// The Ip protocol.
-///
-/// See `include/uapi/linux/in.h` for more information.
-pub enum IpProtocol {
-    // TODO: implement the rest of the protocols
-    /// Unspecified protocol.
-    Ip = bindings::IPPROTO_IP as isize,
-    /// Internet Control Message Protocol.
-    Icmp = bindings::IPPROTO_ICMP as isize,
-    /// Transmission Control Protocol.
-    Tcp = bindings::IPPROTO_TCP as isize,
-    /// User Datagram Protocol.
-    Udp = bindings::IPPROTO_UDP as isize,
-    /// IPv6-in-IPv4 tunnelling.
-    Ipv6 = bindings::IPPROTO_IPV6 as isize,
-    /// Raw IP packets.
-    Raw = bindings::IPPROTO_RAW as isize,
 }
 
 /// Network namespace.
