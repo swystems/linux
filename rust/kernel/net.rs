@@ -10,10 +10,11 @@
 use core::cell::UnsafeCell;
 
 pub mod addr;
+pub mod dev;
+pub mod skb;
 pub mod socket;
 pub mod tcp;
 pub mod udp;
-pub mod ip;
 
 /// The address family.
 ///
