@@ -9,6 +9,8 @@
 
 use crate::error::{code, Error};
 use core::cell::UnsafeCell;
+
+pub mod addr;
 pub mod ip;
 
 /// The address family.
