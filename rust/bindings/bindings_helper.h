@@ -7,6 +7,9 @@
  */
 
 #include <linux/errname.h>
+#include <linux/netfilter.h>
+#include <linux/inet.h>
+#include <linux/tcp.h>
 #include <linux/slab.h>
 #include <linux/refcount.h>
 #include <linux/wait.h>
